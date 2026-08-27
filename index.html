@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V12</title>
+<title>Transport Real-Time Control V16</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -28,13 +28,15 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 .row{display:flex;gap:6px;align-items:center}.row input{margin:0}
 .pill{display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700}
 .pill span{cursor:pointer;font-weight:900}
+.modal{display:none;position:fixed;inset:0;background:#000c;align-items:center;justify-content:center;padding:20px;z-index:1000;cursor:pointer}
+.modal.show{display:flex}
 .stopBlock{padding:10px 12px;margin-bottom:10px;background:#f8fafc;box-shadow:none;border:1px solid #e5eaf1;border-radius:10px}
 @media(max-width:1050px){.cards{grid-template-columns:repeat(4,1fr)}}@media(max-width:800px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:550px){.cards{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V12 • Sync รายชื่อพนักงานขับรถกับ Google Sheets แล้ว</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V16 • ค้นหารถด้วยเลข SO อันไหนก็ได้ในเที่ยวงาน</div></div>
 <div id="clock"></div>
 </header>
 
@@ -63,12 +65,17 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <div class="panel">
 <h2>🏭 บันทึกสถานะโรงงาน</h2>
 <p class="small">บันทึกรถที่เข้า-ออกโรงงานและปรับสถานะการเตรียมสินค้า — เพิ่มทะเบียนรถใหม่ได้ตลอดเวลาเมื่อมีรถเข้ามา</p>
+<label>🔍 หรือค้นหาด้วยเลขที่ SO (พิมพ์เลขไหนก็ได้ในเที่ยวงาน ระบบหารถให้อัตโนมัติ)</label>
+<input list="soDatalist" id="soSearchInput" placeholder="พิมพ์เลขที่ SO..." autocomplete="off" oninput="onSoSearchInput()">
+<datalist id="soDatalist"></datalist>
 <label>ทะเบียนรถ</label><select id="adminTruck" onchange="onAdminTruckChange()"></select>
 <div class="row" style="margin:-4px 0 12px">
 <input id="newPlateInput" placeholder="เพิ่มทะเบียนรถใหม่ เช่น 70-9999">
 <button type="button" class="primary" style="width:auto;padding:10px 14px;white-space:nowrap" onclick="addTruck()">+ เพิ่มรถ</button>
 </div>
 <button type="button" class="reason" style="text-align:center;font-weight:700;color:#b91c1c;border-color:#fecdd3" onclick="removeTruck()">🗑 ลบทะเบียนรถนี้ออกจากระบบ (รถออกจากกองยานถาวร)</button>
+<div id="adminTruckInfo" class="small" style="margin:-4px 0 12px;padding:8px 10px;background:#f8fafc;border-radius:8px"></div>
+<button type="button" class="reason" style="text-align:center;font-weight:700;color:#9a3412;border-color:#fed7aa" onclick="clearVerification()">🗑 ล้างข้อมูลยืนยันตัวตนคนขับ (ลบชื่อ+รูป)</button>
 <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #d7dee8">
 <label>📥 อัปโหลดทะเบียนรถจากไฟล์ Excel/CSV (เพิ่มทีเดียวหลายคัน)</label>
 <input type="file" id="truckExcelInput" accept=".xlsx,.xls,.csv">
@@ -76,7 +83,8 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <p class="small" style="margin-top:6px">ไฟล์ต้องมีทะเบียนรถอยู่ใน<b>คอลัมน์แรก (A)</b> แถวละ 1 คัน จะมีหัวตาราง หรือไม่มีก็ได้ ระบบจะข้ามทะเบียนที่ซ้ำให้อัตโนมัติ</p>
 </div>
 <label>ชื่อพนักงานขับรถ (มอบหมายเที่ยวนี้)</label>
-<select id="adminDriverSelect"></select>
+<input list="staffDatalist" id="adminDriverSelect" placeholder="พิมพ์ชื่อพนักงาน แล้วเลือกจากรายการที่ขึ้นมา" autocomplete="off">
+<datalist id="staffDatalist"></datalist>
 <label>สถานะ</label>
 <select id="adminStatus">
 <option>เตรียมสินค้าแล้ว</option><option>ตรวจนับสินค้าแล้ว</option><option>โหลดสินค้าเสร็จแล้ว</option><option>เปิดบิลแล้ว</option>
@@ -124,6 +132,10 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </div>
 </section>
 </main>
+
+<div class="modal" id="photoModal" onclick="closePhotoModal()">
+<img id="photoModalImg" src="" style="max-width:90vw;max-height:85vh;border-radius:12px;box-shadow:0 10px 40px #0006">
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -258,6 +270,7 @@ return"red";
 function truckHasProblem(t){return (t.stops||[]).some(s=>s.problem)}
 
 function render(){
+populateSoDatalist();
 let issues=trucks.filter(truckHasProblem).length;
 let statusCount=(name)=>trucks.filter(t=>t.status===name).length;
 cards.innerHTML=[
@@ -277,7 +290,7 @@ let mismatch=t.assignedDriver&&t.verifiedDriver&&t.assignedDriver!==t.verifiedDr
 return `<tr onclick="selectTruck(${i})" style="cursor:pointer">
 <td><b>${t.id}</b><br><span class="muted">${t.assignedDriver?"มอบหมาย: "+t.assignedDriver:""}</span></td>
 <td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?'<div style="color:#b91c1c;font-weight:700">⚠️ ไม่ตรงกับที่มอบหมาย</div>':''}`:'<span class="muted">ยังไม่ยืนยัน</span>'}</td>
-<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="event.stopPropagation();window.open('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
+<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="event.stopPropagation();showPhotoModal('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
 <td>${custList}</td>
 <td style="font-size:11px">${soList}</td>
 <td><span class="badge ${truckHasProblem(t)?'red':cls(t.status)}">${truckHasProblem(t)?'⚠️ ติดปัญหา':t.status}</span></td>
@@ -321,7 +334,7 @@ stopCells+=`<td><span class="muted">-</span></td><td><span class="muted">-</span
 let tailCells=["รถกำลังกลับบริษัท","รถถึงบริษัทแล้ว"].map(s=>`<td>${h[s]?h[s].time:'<span class="muted">-</span>'}</td>`).join("");
 return `<tr><td><b>${t.id}</b></td>
 <td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?' <span style="color:#b91c1c;font-weight:700">⚠️</span>':''}`:'<span class="muted">-</span>'}</td>
-<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="window.open('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
+<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="showPhotoModal('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
 <td>${custList}</td>${baseCells}${stopCells}${tailCells}</tr>`;
 }).join("");
 }
@@ -377,6 +390,7 @@ populate();
 adminTruck.value=trucks.length-1;
 render();
 apiSaveTruck(trucks[trucks.length-1]);
+onAdminTruckChange();
 alert("เพิ่มรถ "+plate+" เข้าระบบแล้ว");
 }
 
@@ -394,8 +408,22 @@ return;
 populate();
 adminTruck.value=Math.min(i,trucks.length-1);
 selected=Math.min(selected,trucks.length-1);
-loadJob();render();onTruckChange();
+loadJob();render();onTruckChange();onAdminTruckChange();
 alert("ลบรถ "+t.id+" ออกจากระบบแล้ว");
+}
+
+function clearVerification(){
+let i=+adminTruck.value,t=trucks[i];
+if(!t.verifiedDriver&&!t.verifiedPhoto){alert("รถคันนี้ยังไม่มีข้อมูลยืนยันตัวตนให้ล้าง");return}
+let pin=prompt('ยืนยันตัวตน (ชื่อ+รูป) ของรถ "'+t.id+'" — คนขับปัจจุบัน: '+(t.verifiedDriver||'-')+'\n\nเที่ยวงานนี้:\n'+tripSummary(t)+'\n\nการลบนี้ย้อนกลับไม่ได้ กรุณากรอกรหัสเพื่อยืนยัน:');
+if(pin===null)return;
+if(pin!=="NK2521"){alert("รหัสไม่ถูกต้อง ยกเลิกการลบ");return}
+t.verifiedDriver=null;t.verifiedTime=null;t.verifiedPhoto=null;
+let di=+driverTruck.value;
+if(verifiedFor===di&&di===i)verifiedFor=null;
+render();showDriver();renderVerify();onAdminTruckChange();
+apiSaveTruck(t);
+alert("ล้างข้อมูลยืนยันตัวตนของรถ "+t.id+" เรียบร้อยแล้ว");
 }
 
 function selectTruck(i){selected=i;driverTruck.value=i;renderTimeline()}
@@ -417,21 +445,71 @@ apiLogEvent(t.id,s,stopIndexForLog,customerForLog);
 
 function adminUpdate(){
 let i=+adminTruck.value;
-if(adminDriverSelect.value)trucks[i].assignedDriver=adminDriverSelect.value;
+let typed=adminDriverSelect.value.trim();
+if(typed){
+if(!staffList.includes(typed)){
+alert('ไม่พบชื่อ "'+typed+'" ในรายชื่อพนักงาน กรุณาพิมพ์เลือกจากรายการที่ขึ้นมา หรือไปเพิ่มชื่อนี้ในหน้า Driver Mobile ก่อน');
+return;
+}
+trucks[i].assignedDriver=typed;
+}
 update(i,adminStatus.value);
 }
 
 function populateAdminDriverSelect(){
 let sel=document.getElementById("adminDriverSelect");
+let dl=document.getElementById("staffDatalist");
+if(dl)dl.innerHTML=staffList.map(n=>`<option value="${n}">`).join("");
 if(!sel)return;
 let cur=sel.value;
-sel.innerHTML=staffList.length?staffList.map(n=>`<option>${n}</option>`).join(""):'<option value="">-- ยังไม่มีรายชื่อพนักงาน --</option>';
-if(staffList.includes(cur))sel.value=cur;
+if(!staffList.length)sel.placeholder="ยังไม่มีรายชื่อพนักงาน กรุณาเพิ่มในหน้า Driver Mobile ก่อน";
+else if(staffList.includes(cur))sel.value=cur;
+}
+
+function tripSummary(t){
+let stops=t.stops||[];
+if(!stops.length)return "ยังไม่มีข้อมูลเที่ยวงาน";
+return stops.map((s,k)=>"จุดที่ "+(k+1)+": "+(s.customer||'(ยังไม่ระบุลูกค้า)')+" • SO: "+((s.so||[]).join(", ")||'-')).join("\n");
+}
+
+function populateSoDatalist(){
+let dl=document.getElementById("soDatalist");
+if(!dl)return;
+let all=[];
+trucks.forEach(t=>{(t.stops||[]).forEach(s=>{(s.so||[]).forEach(so=>{if(so)all.push(so);})})});
+dl.innerHTML=[...new Set(all)].map(so=>`<option value="${so}">`).join("");
+}
+
+function findTruckIndexBySo(soQuery){
+let q=soQuery.trim();
+if(!q)return -1;
+for(let i=0;i<trucks.length;i++){
+let found=(trucks[i].stops||[]).some(s=>(s.so||[]).some(so=>so===q));
+if(found)return i;
+}
+return -1;
+}
+
+function onSoSearchInput(){
+let q=soSearchInput.value.trim();
+if(!q)return;
+let idx=findTruckIndexBySo(q);
+if(idx>=0){
+adminTruck.value=idx;
+onAdminTruckChange();
+soSearchInput.value="";
+soSearchInput.placeholder="✓ พบรถ "+trucks[idx].id+" จาก SO: "+q;
+}
 }
 
 function onAdminTruckChange(){
 let t=trucks[+adminTruck.value];
 if(t&&t.assignedDriver&&staffList.includes(t.assignedDriver))adminDriverSelect.value=t.assignedDriver;
+let infoBox=document.getElementById("adminTruckInfo");
+if(infoBox&&t){
+infoBox.innerHTML="<b>เที่ยวงานปัจจุบันของรถนี้:</b><br>"+tripSummary(t).replace(/\n/g,"<br>")+
+(t.verifiedDriver?"<br><b>ยืนยันตัวตนโดย:</b> "+t.verifiedDriver:"<br><span class=\"muted\">ยังไม่มีการยืนยันตัวตน</span>");
+}
 }
 
 function renderStopsRows(list){
@@ -504,6 +582,7 @@ s.doneTime=t.stops[i].doneTime;s.doneTs=t.stops[i].doneTs;
 t.stops=newStops;
 render();showDriver();renderReasonSection();
 apiSaveTruck(t);
+onAdminTruckChange();
 alert("บันทึกข้อมูลเที่ยวรถแล้ว — อัปเดตไปที่การ์ด Driver Mobile ให้อัตโนมัติ");
 }
 
@@ -663,15 +742,29 @@ render();showDriver();renderReasonSection();
 
 function renderStaffManager(){
 return `<div class="panel" style="padding:10px 12px;margin-bottom:10px;background:#f8fafc;box-shadow:none;border:1px solid #e5eaf1">
-<b class="small">จัดการรายชื่อพนักงานขับรถ</b>
-<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">
-${staffList.length?staffList.map((n,idx)=>`<span class="pill">${n}<span onclick="removeStaff(${idx})">×</span></span>`).join(""):'<span class="muted">ยังไม่มีรายชื่อ</span>'}
-</div>
+<b class="small">จัดการรายชื่อพนักงานขับรถ (${staffList.length} คน)</b>
+<input id="staffSearchBox" placeholder="🔍 พิมพ์ค้นหาชื่อพนักงาน..." oninput="renderStaffPills()" style="margin:8px 0">
+<div id="staffPillsBox" style="max-height:160px;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;margin-bottom:8px;padding:2px"></div>
 <div class="row">
 <input id="newStaffName" placeholder="ชื่อพนักงานใหม่">
 <button type="button" class="primary" style="width:auto;padding:10px 14px" onclick="addStaff()">+ เพิ่ม</button>
 </div>
 </div>`;
+}
+
+function renderStaffPills(){
+let box=document.getElementById("staffPillsBox");
+if(!box)return;
+let q=(document.getElementById("staffSearchBox")?.value||"").trim();
+let items=staffList.map((n,idx)=>({n,idx}));
+if(q){
+items=items.filter(x=>x.n.includes(q));
+}else if(staffList.length>12){
+box.innerHTML='<span class="muted">มีทั้งหมด '+staffList.length+' คน — พิมพ์ค้นหาชื่อด้านบนเพื่อดู/ลบทีละคน</span>';
+return;
+}
+box.innerHTML=items.length?items.map(x=>`<span class="pill">${x.n}<span onclick="removeStaff(${x.idx})">×</span></span>`).join(""):
+(staffList.length?'<span class="muted">ไม่พบชื่อที่ค้นหา</span>':'<span class="muted">ยังไม่มีรายชื่อ</span>');
 }
 
 function addStaff(){
@@ -709,13 +802,14 @@ let manager=renderStaffManager();
 if(verifiedFor===i){
 driverVerify.innerHTML=manager+`<div class="alert" style="background:#dcfce7;border-color:#bbf7d0;color:#166534">
 ✅ ยืนยันตัวตนแล้ว: <b>${t.verifiedDriver}</b> • เวลา ${t.verifiedTime}
-${t.verifiedPhoto?`<div><img src="${t.verifiedPhoto}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid #bbf7d0"></div>`:''}
+${t.verifiedPhoto?`<div><img src="${t.verifiedPhoto}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid #bbf7d0;cursor:pointer" onclick="showPhotoModal('${t.verifiedPhoto}')"></div>`:''}
 <button class="reason" style="margin-top:8px" onclick="changeDriver()">↺ เปลี่ยนผู้ขับ / ยืนยันใหม่</button>
 </div>`;
+renderStaffPills();
 return;
 }
 driverVerify.innerHTML=manager+`<label>4. ยืนยันตัวตนกับรถที่ขับวันนี้</label>
-${staffList.length?`<select id="staffSelect">${staffList.map(n=>`<option>${n}</option>`).join("")}</select>
+${staffList.length?`<input list="staffDatalist" id="staffSelect" placeholder="พิมพ์ชื่อพนักงาน แล้วเลือกจากรายการ" autocomplete="off">
 <div style="margin:8px 0">
 <video id="camVideo" autoplay playsinline muted style="width:100%;max-width:220px;display:none;border-radius:8px;background:#000"></video>
 <canvas id="camCanvas" style="display:none"></canvas>
@@ -725,6 +819,7 @@ ${staffList.length?`<select id="staffSelect">${staffList.map(n=>`<option>${n}</o
 </div>
 <button class="primary" style="width:100%" id="confirmVerifyBtn" onclick="verifyDriver()" disabled>✓ ยืนยันตัวตน (ต้องถ่ายรูปก่อน)</button>`
 :'<p class="small">กรุณาเพิ่มรายชื่อพนักงานก่อนยืนยันตัวตน</p>'}`;
+renderStaffPills();
 }
 
 function startCamera(){
@@ -761,8 +856,13 @@ btn.disabled=false;btn.textContent="✓ ยืนยันตัวตน";
 
 function verifyDriver(){
 if(!pendingPhoto){alert("กรุณาถ่ายรูปยืนยันตัวตนก่อน");return}
+let typed=staffSelect.value.trim();
+if(!staffList.includes(typed)){
+alert('ไม่พบชื่อ "'+typed+'" ในรายชื่อพนักงาน กรุณาพิมพ์เลือกจากรายการที่ขึ้นมาให้ตรง หรือเพิ่มชื่อนี้ในช่อง "จัดการรายชื่อพนักงาน" ก่อน');
+return;
+}
 let i=+driverTruck.value;
-trucks[i].verifiedDriver=staffSelect.value;
+trucks[i].verifiedDriver=typed;
 trucks[i].verifiedTime=now();
 trucks[i].verifiedPhoto=pendingPhoto;
 pendingPhoto=null;
@@ -774,6 +874,15 @@ apiSaveTruck(trucks[i]);
 function changeDriver(){
 verifiedFor=null;
 renderVerify();showDriver();
+}
+
+function showPhotoModal(src){
+photoModalImg.src=src;
+photoModal.classList.add("show");
+}
+
+function closePhotoModal(){
+photoModal.classList.remove("show");
 }
 
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
