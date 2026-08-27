@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V11</title>
+<title>Transport Real-Time Control V12</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -34,7 +34,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V11 • เชื่อมต่อ Google Sheets เป็นฐานข้อมูลจริงแล้ว</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V12 • Sync รายชื่อพนักงานขับรถกับ Google Sheets แล้ว</div></div>
 <div id="clock"></div>
 </header>
 
@@ -217,6 +217,12 @@ return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"deleteTruck",id
 function apiLogEvent(plate,status,stopIndex,customer){
 return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"logEvent",plate:plate,status:status,stopIndex:stopIndex||"",customer:customer||""})}).catch(err=>console.warn("sync (event) failed:",err));
 }
+function apiAddStaff(name){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"addStaff",name:name})}).catch(err=>console.warn("sync (addStaff) failed:",err));
+}
+function apiRemoveStaff(name){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"removeStaff",name:name})}).catch(err=>console.warn("sync (removeStaff) failed:",err));
+}
 
 async function initFromServer(){
 try{
@@ -224,11 +230,17 @@ let res=await apiGetTrucks();
 if(res&&res.ok&&Array.isArray(res.trucks)&&res.trucks.length){
 trucks.length=0;
 res.trucks.forEach(t=>trucks.push(t));
-populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
 }else{
 // server has no data yet - seed it with our starting demo data
 for(const t of trucks){await apiSaveTruck(t);}
 }
+if(res&&res.ok&&Array.isArray(res.staff)&&res.staff.length){
+staffList.length=0;
+res.staff.forEach(n=>staffList.push(n));
+}else{
+for(const n of staffList){await apiAddStaff(n);}
+}
+populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
 }catch(err){
 console.warn("ไม่สามารถเชื่อมต่อฐานข้อมูลออนไลน์ได้ ใช้ข้อมูลตัวอย่างในเครื่องไปก่อน",err);
 }
@@ -669,12 +681,14 @@ if(staffList.includes(n)){alert("มีชื่อนี้อยู่แล�
 staffList.push(n);
 renderVerify();
 populateAdminDriverSelect();
+apiAddStaff(n);
 }
 
 function removeStaff(idx){
 let name=staffList[idx];
 if(!confirm('ลบพนักงาน "'+name+'" ออกจากรายชื่อ?'))return;
 staffList.splice(idx,1);
+apiRemoveStaff(name);
 let i=+driverTruck.value;
 if(trucks[i]&&trucks[i].verifiedDriver===name){
 trucks[i].verifiedDriver=null;trucks[i].verifiedTime=null;trucks[i].verifiedPhoto=null;
