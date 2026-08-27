@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transport Real-Time Control V11</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
+header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:23px}.sub{opacity:.8;font-size:13px;margin-top:4px}
+nav{display:flex;gap:8px;padding:12px 20px;background:#fff;border-bottom:1px solid #ddd}
+nav button{border:0;background:#edf2f8;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:700}
+nav button.active{background:#1769aa;color:#fff}
+main{padding:20px;max-width:1500px;margin:auto}.page{display:none}.page.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}.card,.panel{background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px #0001}
+.num{font-size:27px;font-weight:800}.label{font-size:12px;color:#64748b;margin-top:4px}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px}.panel h2{margin:0 0 14px;font-size:18px}
+table{width:100%;border-collapse:collapse}th,td{padding:10px 7px;border-bottom:1px solid #edf0f4;text-align:left;font-size:12px}th{background:#f8fafc}
+.badge{padding:5px 8px;border-radius:20px;font-weight:700;font-size:11px;display:inline-block}.green{background:#dcfce7;color:#166534}.blue{background:#dbeafe;color:#1d4ed8}.orange{background:#ffedd5;color:#9a3412}.red{background:#fee2e2;color:#b91c1c}
+input,select{width:100%;padding:10px;border:1px solid #d7dee8;border-radius:8px;margin:4px 0 11px}
+button.primary{background:#1769aa;color:#fff;border:0;padding:11px 16px;border-radius:8px;font-weight:700;cursor:pointer}
+button.primary:disabled{background:#94a3b8;cursor:not-allowed}
+.driver{max-width:480px;margin:auto}.job{background:#f8fafc;padding:15px;border-radius:10px;margin-bottom:12px;line-height:1.75}
+.bigbtn{width:100%;padding:16px;margin:6px 0;border:0;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;background:#e8f1fb;color:#123b68}.bigbtn.next{background:#1769aa;color:#fff}
+.timeline{display:flex;flex-direction:column;gap:8px}.step{display:flex;gap:10px;align-items:center}.dot{width:13px;height:13px;border-radius:50%;background:#1769aa}
+.muted,.small{color:#64748b;font-size:12px}.alert{background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;padding:12px;margin-bottom:12px;color:#9f1239}
+.reason{display:block;width:100%;text-align:left;margin:7px 0;padding:12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer}
+.row{display:flex;gap:6px;align-items:center}.row input{margin:0}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.pill span{cursor:pointer;font-weight:900}
+.stopBlock{padding:10px 12px;margin-bottom:10px;background:#f8fafc;box-shadow:none;border:1px solid #e5eaf1;border-radius:10px}
+@media(max-width:1050px){.cards{grid-template-columns:repeat(4,1fr)}}@media(max-width:800px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:550px){.cards{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V11 • เชื่อมต่อ Google Sheets เป็นฐานข้อมูลจริงแล้ว</div></div>
+<div id="clock"></div>
+</header>
+
+<nav>
+<button class="tab active" data-page="dashboard">Dashboard</button>
+<button class="tab" data-page="admin">Admin / โรงงาน</button>
+<button class="tab" data-page="driver">Driver Mobile</button>
+<button class="tab" data-page="report">📊 รายงานเวลา</button>
+</nav>
+
+<main>
+<section id="dashboard" class="page active">
+<div class="cards" id="cards"></div>
+<div class="grid">
+<div class="panel">
+<h2>สถานะรถทั้งหมด</h2><div id="alerts"></div>
+<table><thead><tr><th>รถ</th><th>คนขับ</th><th>รูป</th><th>ลูกค้า (ตามลำดับจุดส่ง)</th><th>SO</th><th>สถานะปัจจุบัน</th><th>เวลา</th></tr></thead>
+<tbody id="fleet"></tbody></table>
+</div>
+<div class="panel"><h2>Timeline เที่ยวรถ</h2><div id="timeline" class="timeline"></div></div>
+</div>
+</section>
+
+<section id="admin" class="page">
+<div class="grid">
+<div class="panel">
+<h2>🏭 บันทึกสถานะโรงงาน</h2>
+<p class="small">บันทึกรถที่เข้า-ออกโรงงานและปรับสถานะการเตรียมสินค้า — เพิ่มทะเบียนรถใหม่ได้ตลอดเวลาเมื่อมีรถเข้ามา</p>
+<label>ทะเบียนรถ</label><select id="adminTruck" onchange="onAdminTruckChange()"></select>
+<div class="row" style="margin:-4px 0 12px">
+<input id="newPlateInput" placeholder="เพิ่มทะเบียนรถใหม่ เช่น 70-9999">
+<button type="button" class="primary" style="width:auto;padding:10px 14px;white-space:nowrap" onclick="addTruck()">+ เพิ่มรถ</button>
+</div>
+<button type="button" class="reason" style="text-align:center;font-weight:700;color:#b91c1c;border-color:#fecdd3" onclick="removeTruck()">🗑 ลบทะเบียนรถนี้ออกจากระบบ (รถออกจากกองยานถาวร)</button>
+<div style="margin-top:14px;padding-top:14px;border-top:1px dashed #d7dee8">
+<label>📥 อัปโหลดทะเบียนรถจากไฟล์ Excel/CSV (เพิ่มทีเดียวหลายคัน)</label>
+<input type="file" id="truckExcelInput" accept=".xlsx,.xls,.csv">
+<button type="button" class="primary" style="width:100%" onclick="uploadTrucksExcel()">อัปโหลดและเพิ่มรถทั้งหมด</button>
+<p class="small" style="margin-top:6px">ไฟล์ต้องมีทะเบียนรถอยู่ใน<b>คอลัมน์แรก (A)</b> แถวละ 1 คัน จะมีหัวตาราง หรือไม่มีก็ได้ ระบบจะข้ามทะเบียนที่ซ้ำให้อัตโนมัติ</p>
+</div>
+<label>ชื่อพนักงานขับรถ (มอบหมายเที่ยวนี้)</label>
+<select id="adminDriverSelect"></select>
+<label>สถานะ</label>
+<select id="adminStatus">
+<option>เตรียมสินค้าแล้ว</option><option>ตรวจนับสินค้าแล้ว</option><option>โหลดสินค้าเสร็จแล้ว</option><option>เปิดบิลแล้ว</option>
+</select>
+<button class="primary" onclick="adminUpdate()">บันทึกสถานะ</button>
+</div>
+
+<div class="panel">
+<h2>📋 ข้อมูลเที่ยวรถ (รองรับส่งหลายจุด สูงสุด 3 จุด)</h2>
+<label>ทะเบียนรถ</label><select id="jobTruck" onchange="loadJob()"></select>
+<div id="stopsContainer"></div>
+<button type="button" class="reason" style="text-align:center;font-weight:700" onclick="addStopRow()">+ เพิ่มจุดส่ง (ลูกค้า) — สูงสุด 3 จุด</button>
+<button class="primary" onclick="saveJob()">บันทึกข้อมูลเที่ยวรถ</button>
+</div>
+</div>
+</section>
+
+<section id="driver" class="page">
+<div class="panel driver">
+<h2>📱 Driver Mobile</h2>
+<label>1. ทะเบียนรถที่ขับวันนี้</label><select id="driverTruck" onchange="onTruckChange()"></select>
+<div id="driverJob"></div>
+<div id="driverButtons"></div>
+<div id="reasonSection"></div>
+<div id="driverVerify"></div>
+</div>
+</section>
+
+<section id="report" class="page">
+<div class="panel">
+<h2>📊 รายงานเวลาแต่ละขั้นตอน (Time &amp; Motion Report)</h2>
+<p class="small">เวลาที่แต่ละคันผ่านแต่ละขั้นตอน บันทึกอัตโนมัติทุกครั้งที่มีการเปลี่ยนสถานะ รองรับส่งหลายจุดต่อเที่ยว (สูงสุด 3 จุด แสดงเวลาถึง/เสร็จแยกแต่ละจุด)</p>
+<button class="primary" style="width:auto;padding:10px 14px;margin-bottom:12px" onclick="exportReportExcel()">⬇️ ดาวน์โหลดรายงาน Excel</button>
+<div style="overflow-x:auto">
+<table id="reportTable">
+<thead><tr>
+<th>รถ</th><th>คนขับ</th><th>รูป</th><th>ลูกค้าที่ส่ง (ตามลำดับ)</th>
+<th>เตรียมสินค้า</th><th>ตรวจนับ</th><th>โหลดเสร็จ</th><th>เปิดบิล</th><th>ออกจากบริษัท</th>
+<th>ถึงจุด 1</th><th>เสร็จจุด 1</th><th>ถึงจุด 2</th><th>เสร็จจุด 2</th><th>ถึงจุด 3</th><th>เสร็จจุด 3</th>
+<th>เริ่มกลับ</th><th>ถึงบริษัท</th>
+</tr></thead>
+<tbody id="reportBody"></tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const reasons=["พื้นที่เต็ม","รอคิวลง","ติดพักเที่ยง","อื่นๆ"];
+const staffList=["สมชาย ใจดี","วิชัย รักงาน","ประสิทธิ์ มั่นคง","สุชาติ ขยันดี","อนุชา แข็งแรง","กิตติ บุญมา"];
+const FACTORY_STEPS=["เตรียมสินค้าแล้ว","ตรวจนับสินค้าแล้ว","โหลดสินค้าเสร็จแล้ว","เปิดบิลแล้ว","รถออกจากบริษัทแล้ว"];
+
+function stepsFor(t){
+let s=FACTORY_STEPS.slice();
+let stopsArr=(t.stops&&t.stops.length)?t.stops:[{}];
+stopsArr.forEach((st,idx)=>{
+s.push("ถึงลูกค้าจุดที่ "+(idx+1));
+s.push("ลงสินค้าเสร็จจุดที่ "+(idx+1));
+});
+s.push("รถกำลังกลับบริษัท","รถถึงบริษัทแล้ว");
+return s;
+}
+
+function currentStopIndex(t){
+let steps=stepsFor(t),idx=steps.indexOf(t.status);
+if(idx<5)return -1;
+let stopsArr=(t.stops&&t.stops.length)?t.stops:[{}];
+let after=idx-5;
+if(after<stopsArr.length*2)return Math.floor(after/2);
+return stopsArr.length;
+}
+
+function makeEmptyStop(){
+return {customer:"",so:[],qty:0,unit:"แผ่น",pallets:0,problem:null,arriveTime:null,arriveTs:null,doneTime:null,doneTs:null};
+}
+
+const trucks=Array.from({length:20},(_,i)=>({
+id:"70-"+String(1000+i),
+stops:[Object.assign(makeEmptyStop(),{
+customer:["บริษัท ABC","บริษัท XYZ","บริษัท DEF","บริษัท GHI"][i%4],
+so:["SO-260821-"+String(i+1).padStart(3,"0")],
+qty:1000+(i%8)*250,
+unit:i%3===0?"แผ่น":i%3===1?"กล่อง":"ชิ้น",
+pallets:10+(i%10)
+})],
+status:FACTORY_STEPS[Math.min(i%9,3)],
+time:"07:"+String(10+i%45).padStart(2,"0"),
+verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,
+assignedDriver:null,
+history:{}
+}));
+
+trucks[0].status="โหลดสินค้าเสร็จแล้ว";trucks[0].verifiedDriver="สมชาย ใจดี";trucks[0].verifiedTime="07:05";
+trucks[1].status="รถออกจากบริษัทแล้ว";trucks[1].verifiedDriver="วิชัย รักงาน";trucks[1].verifiedTime="06:58";
+trucks[2].status="ถึงลูกค้าจุดที่ 1";trucks[2].verifiedDriver="ประสิทธิ์ มั่นคง";trucks[2].verifiedTime="06:40";
+trucks[3].status="รถกำลังกลับบริษัท";
+trucks[4].status="รถถึงบริษัทแล้ว";
+trucks[5].status="ถึงลูกค้าจุดที่ 1";trucks[5].stops[0].problem="พื้นที่เต็ม";
+// demo: give truck index 6 a 2-stop trip already at stop 2, truck 7 a 3-stop trip finished stop1
+trucks[6].stops.push(Object.assign(makeEmptyStop(),{customer:"บริษัท JKL",so:["SO-260821-900"],qty:600,unit:"กล่อง",pallets:6}));
+trucks[6].status="ถึงลูกค้าจุดที่ 2";trucks[6].verifiedDriver="สุชาติ ขยันดี";trucks[6].verifiedTime="06:20";
+trucks[7].stops.push(Object.assign(makeEmptyStop(),{customer:"บริษัท MNO",so:["SO-260821-901"],qty:400,unit:"ชิ้น",pallets:4}));
+trucks[7].stops.push(Object.assign(makeEmptyStop(),{customer:"บริษัท PQR",so:["SO-260821-902"],qty:300,unit:"แผ่น",pallets:3}));
+trucks[7].status="ลงสินค้าเสร็จจุดที่ 1";trucks[7].verifiedDriver="อนุชา แข็งแรง";trucks[7].verifiedTime="06:10";
+
+// seed synthetic historical timestamps for demo trucks (15 min apart per stage)
+trucks.forEach(t=>{
+let steps=stepsFor(t),idx=steps.indexOf(t.status);
+let [hh,mm]=t.time.split(":").map(Number);
+for(let k=idx;k>=0;k--){
+let mins=hh*60+mm-(idx-k)*15;
+let hh2=(Math.floor(mins/60)+24)%24,mm2=((mins%60)+60)%60;
+let label=String(hh2).padStart(2,"0")+":"+String(mm2).padStart(2,"0");
+t.history[steps[k]]={time:label,ts:Date.now()-(idx-k)*15*60000};
+let m=steps[k].match(/^ถึงลูกค้าจุดที่ (\d+)$/);
+if(m){let si=+m[1]-1;if(t.stops[si]){t.stops[si].arriveTime=label;t.stops[si].arriveTs=t.history[steps[k]].ts;}}
+let m2=steps[k].match(/^ลงสินค้าเสร็จจุดที่ (\d+)$/);
+if(m2){let si=+m2[1]-1;if(t.stops[si]){t.stops[si].doneTime=label;t.stops[si].doneTs=t.history[steps[k]].ts;}}
+}
+});
+
+let selected=0,verifiedFor=null;
+
+// ===== Google Sheets backend sync =====
+const API_URL="https://script.google.com/macros/s/AKfycbx023NaJG4kgHl5sK7PYbQPPfD97GA8hefh7pPmoBJOVdUu2FEDzl7nJSfAhkIh1i2COA/exec";
+
+function apiGetTrucks(){
+return fetch(API_URL).then(r=>r.json());
+}
+function apiSaveTruck(t){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"saveTruck",truck:t})}).catch(err=>console.warn("sync (save) failed:",err));
+}
+function apiDeleteTruck(id){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"deleteTruck",id:id})}).catch(err=>console.warn("sync (delete) failed:",err));
+}
+function apiLogEvent(plate,status,stopIndex,customer){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"logEvent",plate:plate,status:status,stopIndex:stopIndex||"",customer:customer||""})}).catch(err=>console.warn("sync (event) failed:",err));
+}
+
+async function initFromServer(){
+try{
+let res=await apiGetTrucks();
+if(res&&res.ok&&Array.isArray(res.trucks)&&res.trucks.length){
+trucks.length=0;
+res.trucks.forEach(t=>trucks.push(t));
+populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
+}else{
+// server has no data yet - seed it with our starting demo data
+for(const t of trucks){await apiSaveTruck(t);}
+}
+}catch(err){
+console.warn("ไม่สามารถเชื่อมต่อฐานข้อมูลออนไลน์ได้ ใช้ข้อมูลตัวอย่างในเครื่องไปก่อน",err);
+}
+}
+
+function now(){return new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+
+function cls(s){
+if(s==="เตรียมสินค้าแล้ว"||s==="ตรวจนับสินค้าแล้ว"||s==="รถออกจากบริษัทแล้ว"||/^ถึงลูกค้าจุดที่/.test(s))return"blue";
+if(s==="เปิดบิลแล้ว"||s==="โหลดสินค้าเสร็จแล้ว"||/^ลงสินค้าเสร็จจุดที่/.test(s)||s==="รถถึงบริษัทแล้ว")return"green";
+if(s==="รถกำลังกลับบริษัท")return"orange";
+return"red";
+}
+
+function truckHasProblem(t){return (t.stops||[]).some(s=>s.problem)}
+
+function render(){
+let issues=trucks.filter(truckHasProblem).length;
+let statusCount=(name)=>trucks.filter(t=>t.status===name).length;
+cards.innerHTML=[
+["รถทั้งหมด",trucks.length],
+["เตรียม/ตรวจนับ",statusCount("เตรียมสินค้าแล้ว")+statusCount("ตรวจนับสินค้าแล้ว")],
+["โหลดเสร็จ",statusCount("โหลดสินค้าเสร็จแล้ว")],
+["ออกรถแล้ว",statusCount("รถออกจากบริษัทแล้ว")],
+["กำลังส่งของ",trucks.filter(t=>{let i=currentStopIndex(t);return i>=0&&i<(t.stops||[]).length}).length],
+["กำลังกลับ",statusCount("รถกำลังกลับบริษัท")],
+["ติดปัญหา",issues]
+].map(x=>`<div class="card"><div class="num">${x[1]}</div><div class="label">${x[0]}</div></div>`).join("");
+
+fleet.innerHTML=trucks.map((t,i)=>{
+let custList=(t.stops||[]).map(s=>s.customer||"-").join(" → ")||'<span class="muted">-</span>';
+let soList=(t.stops||[]).map(s=>(s.so||[]).join(",")).filter(Boolean).join(" | ")||'<span class="muted">-</span>';
+let mismatch=t.assignedDriver&&t.verifiedDriver&&t.assignedDriver!==t.verifiedDriver;
+return `<tr onclick="selectTruck(${i})" style="cursor:pointer">
+<td><b>${t.id}</b><br><span class="muted">${t.assignedDriver?"มอบหมาย: "+t.assignedDriver:""}</span></td>
+<td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?'<div style="color:#b91c1c;font-weight:700">⚠️ ไม่ตรงกับที่มอบหมาย</div>':''}`:'<span class="muted">ยังไม่ยืนยัน</span>'}</td>
+<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="event.stopPropagation();window.open('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
+<td>${custList}</td>
+<td style="font-size:11px">${soList}</td>
+<td><span class="badge ${truckHasProblem(t)?'red':cls(t.status)}">${truckHasProblem(t)?'⚠️ ติดปัญหา':t.status}</span></td>
+<td>${t.time}</td></tr>`;
+}).join("");
+
+alerts.innerHTML=trucks.filter(truckHasProblem).map(t=>{
+let probStops=(t.stops||[]).map((s,k)=>s.problem?`จุดที่ ${k+1} (${s.customer||'-'}): ${s.problem}`:null).filter(Boolean).join(" | ");
+return `<div class="alert"><b>🔴 ${t.id} — คนขับ: ${t.verifiedDriver||'-'}</b><br>${probStops} • ${t.time}</div>`;
+}).join("");
+
+renderTimeline();
+renderReport();
+}
+
+function renderTimeline(){
+let t=trucks[selected],steps=stepsFor(t),cur=steps.indexOf(t.status),h=t.history||{};
+timeline.innerHTML=steps.map((s,i)=>`
+<div class="step"><div class="dot" style="opacity:${cur>=i?1:.22}"></div>
+<div><b>${i+1}. ${s}</b><div class="muted">${h[s]?h[s].time:(cur>=i?"เสร็จแล้ว":"รอดำเนินการ")}</div></div></div>`).join("");
+}
+
+function renderReport(){
+let body=document.getElementById("reportBody");
+if(!body)return;
+body.innerHTML=trucks.map(t=>{
+let h=t.history||{};
+let stopsArr=t.stops||[];
+let mismatch=t.assignedDriver&&t.verifiedDriver&&t.assignedDriver!==t.verifiedDriver;
+let custList=stopsArr.map(s=>s.customer||"-").join(" → ")||'<span class="muted">-</span>';
+let baseCells=FACTORY_STEPS.map(s=>`<td>${h[s]?h[s].time:'<span class="muted">-</span>'}</td>`).join("");
+let stopCells="";
+for(let k=0;k<3;k++){
+if(k<stopsArr.length){
+let al="ถึงลูกค้าจุดที่ "+(k+1),dl="ลงสินค้าเสร็จจุดที่ "+(k+1);
+stopCells+=`<td>${h[al]?h[al].time:'<span class="muted">-</span>'}</td><td>${h[dl]?h[dl].time:'<span class="muted">-</span>'}</td>`;
+}else{
+stopCells+=`<td><span class="muted">-</span></td><td><span class="muted">-</span></td>`;
+}
+}
+let tailCells=["รถกำลังกลับบริษัท","รถถึงบริษัทแล้ว"].map(s=>`<td>${h[s]?h[s].time:'<span class="muted">-</span>'}</td>`).join("");
+return `<tr><td><b>${t.id}</b></td>
+<td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?' <span style="color:#b91c1c;font-weight:700">⚠️</span>':''}`:'<span class="muted">-</span>'}</td>
+<td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="window.open('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
+<td>${custList}</td>${baseCells}${stopCells}${tailCells}</tr>`;
+}).join("");
+}
+
+function exportReportExcel(){
+if(typeof XLSX==="undefined"){alert("ไม่สามารถโหลดไลบรารี Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่");return}
+let rows=trucks.map(t=>{
+let h=t.history||{},stopsArr=t.stops||[];
+let row={
+"ทะเบียนรถ":t.id,
+"คนขับที่ยืนยัน":t.verifiedDriver||"",
+"คนขับที่มอบหมาย":t.assignedDriver||"",
+"ตรงกันหรือไม่":t.verifiedDriver?(t.assignedDriver&&t.assignedDriver!==t.verifiedDriver?"ไม่ตรงกัน":"ตรงกัน"):"",
+"ลูกค้าที่ส่ง(ตามลำดับ)":stopsArr.map(s=>s.customer||"-").join(" -> ")
+};
+FACTORY_STEPS.forEach(s=>{row[s]=h[s]?h[s].time:""});
+for(let k=0;k<3;k++){
+let al="ถึงลูกค้าจุดที่ "+(k+1),dl="ลงสินค้าเสร็จจุดที่ "+(k+1);
+row["ถึงจุด"+(k+1)]=h[al]?h[al].time:"";
+row["เสร็จจุด"+(k+1)]=h[dl]?h[dl].time:"";
+}
+row["เริ่มกลับ"]=h["รถกำลังกลับบริษัท"]?h["รถกำลังกลับบริษัท"].time:"";
+row["ถึงบริษัท"]=h["รถถึงบริษัทแล้ว"]?h["รถถึงบริษัทแล้ว"].time:"";
+return row;
+});
+let ws=XLSX.utils.json_to_sheet(rows);
+let wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,ws,"TimeReport");
+XLSX.writeFile(wb,"transport-time-report-"+new Date().toISOString().slice(0,10)+".xlsx");
+}
+
+function populate(){
+let cur={adminTruck:document.getElementById("adminTruck")?.value,
+jobTruck:document.getElementById("jobTruck")?.value,
+driverTruck:document.getElementById("driverTruck")?.value};
+["adminTruck","jobTruck","driverTruck"].forEach(id=>{
+document.getElementById(id).innerHTML=trucks.map((t,i)=>`<option value="${i}">${t.id}</option>`).join("");
+});
+if(cur.jobTruck)document.getElementById("jobTruck").value=cur.jobTruck;
+if(cur.driverTruck)document.getElementById("driverTruck").value=cur.driverTruck;
+if(cur.adminTruck)document.getElementById("adminTruck").value=cur.adminTruck;
+}
+
+function addTruck(){
+let plate=newPlateInput.value.trim();
+if(!plate){alert("กรุณาระบุทะเบียนรถ");return}
+if(trucks.some(t=>t.id===plate)){alert("มีทะเบียนรถนี้อยู่ในระบบแล้ว");return}
+trucks.push({id:plate,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),
+verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
+history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}});
+newPlateInput.value="";
+populate();
+adminTruck.value=trucks.length-1;
+render();
+apiSaveTruck(trucks[trucks.length-1]);
+alert("เพิ่มรถ "+plate+" เข้าระบบแล้ว");
+}
+
+function removeTruck(){
+if(!trucks.length){return}
+let i=+adminTruck.value,t=trucks[i];
+if(!confirm('ลบทะเบียนรถ "'+t.id+'" ออกจากระบบถาวร?\nข้อมูลเที่ยวรถ สถานะ และประวัติของรถคันนี้จะหายไปทั้งหมด')) return;
+trucks.splice(i,1);
+apiDeleteTruck(t.id);
+if(!trucks.length){
+alert("ลบรถ "+t.id+" ออกจากระบบแล้ว (ไม่มีรถในระบบแล้ว กรุณาเพิ่มรถใหม่)");
+populate();render();
+return;
+}
+populate();
+adminTruck.value=Math.min(i,trucks.length-1);
+selected=Math.min(selected,trucks.length-1);
+loadJob();render();onTruckChange();
+alert("ลบรถ "+t.id+" ออกจากระบบแล้ว");
+}
+
+function selectTruck(i){selected=i;driverTruck.value=i;renderTimeline()}
+
+function update(i,s){
+let t=trucks[i];
+t.status=s;t.time=now();
+t.history=t.history||{};
+t.history[s]={time:now(),ts:Date.now()};
+let stopIndexForLog="",customerForLog="";
+let m=s.match(/^ถึงลูกค้าจุดที่ (\d+)$/);
+if(m){let k=+m[1]-1;if(t.stops[k]){t.stops[k].arriveTime=now();t.stops[k].arriveTs=Date.now();stopIndexForLog=k+1;customerForLog=t.stops[k].customer||"";}}
+let m2=s.match(/^ลงสินค้าเสร็จจุดที่ (\d+)$/);
+if(m2){let k=+m2[1]-1;if(t.stops[k]){t.stops[k].doneTime=now();t.stops[k].doneTs=Date.now();stopIndexForLog=k+1;customerForLog=t.stops[k].customer||"";}}
+selected=i;render();showDriver();renderReasonSection();
+apiSaveTruck(t);
+apiLogEvent(t.id,s,stopIndexForLog,customerForLog);
+}
+
+function adminUpdate(){
+let i=+adminTruck.value;
+if(adminDriverSelect.value)trucks[i].assignedDriver=adminDriverSelect.value;
+update(i,adminStatus.value);
+}
+
+function populateAdminDriverSelect(){
+let sel=document.getElementById("adminDriverSelect");
+if(!sel)return;
+let cur=sel.value;
+sel.innerHTML=staffList.length?staffList.map(n=>`<option>${n}</option>`).join(""):'<option value="">-- ยังไม่มีรายชื่อพนักงาน --</option>';
+if(staffList.includes(cur))sel.value=cur;
+}
+
+function onAdminTruckChange(){
+let t=trucks[+adminTruck.value];
+if(t&&t.assignedDriver&&staffList.includes(t.assignedDriver))adminDriverSelect.value=t.assignedDriver;
+}
+
+function renderStopsRows(list){
+if(!list||!list.length)list=[makeEmptyStop()];
+stopsContainer.innerHTML=list.map((st,i)=>`
+<div class="stopBlock">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<b class="small">จุดส่งที่ ${i+1}</b>
+${list.length>1?`<button type="button" onclick="removeStopRow(${i})" style="border:0;background:none;color:#b91c1c;font-weight:800;cursor:pointer">ลบจุดนี้ ×</button>`:""}
+</div>
+<label style="margin:0 0 2px">ชื่อลูกค้า</label><input class="stopCustomer" value="${st.customer||''}" placeholder="เช่น บริษัท ABC">
+<label style="margin:6px 0 2px">เลขที่ SO (คั่นด้วยจุลภาคถ้ามากกว่า 1)</label><input class="stopSo" value="${Array.isArray(st.so)?st.so.join(', '):(st.so||'')}" placeholder="เช่น SO-001, SO-002">
+<div class="row">
+<div style="flex:1"><label style="margin:6px 0 2px">จำนวน</label><input class="stopQty" type="number" value="${st.qty||''}" placeholder="เช่น 500"></div>
+<div style="flex:1"><label style="margin:6px 0 2px">หน่วย</label><select class="stopUnit"><option ${st.unit==="แผ่น"?"selected":""}>แผ่น</option><option ${st.unit==="กล่อง"?"selected":""}>กล่อง</option><option ${st.unit==="ชิ้น"?"selected":""}>ชิ้น</option></select></div>
+</div>
+<label style="margin:6px 0 2px">จำนวนพาเลท</label><input class="stopPallets" type="number" value="${st.pallets||''}" placeholder="เช่น 5">
+</div>`).join("");
+}
+
+function collectStopsFromForm(){
+let blocks=[...document.querySelectorAll("#stopsContainer .stopBlock")];
+return blocks.map(b=>({
+customer:b.querySelector(".stopCustomer").value,
+so:b.querySelector(".stopSo").value,
+qty:b.querySelector(".stopQty").value,
+unit:b.querySelector(".stopUnit").value,
+pallets:b.querySelector(".stopPallets").value
+}));
+}
+
+function addStopRow(){
+let list=collectStopsFromForm();
+if(list.length>=3){alert("ส่งได้สูงสุด 3 จุดต่อเที่ยว");return}
+list.push({customer:"",so:"",qty:"",unit:"แผ่น",pallets:""});
+renderStopsRows(list);
+}
+
+function removeStopRow(i){
+let list=collectStopsFromForm();
+list.splice(i,1);
+renderStopsRows(list);
+}
+
+function loadJob(){
+let t=trucks[+jobTruck.value];
+renderStopsRows(t.stops&&t.stops.length?t.stops:[makeEmptyStop()]);
+}
+
+function saveJob(){
+let t=trucks[+jobTruck.value];
+let raw=collectStopsFromForm();
+let newStops=raw.map(r=>({
+customer:(r.customer||"").trim(),
+so:(r.so||"").split(",").map(x=>x.trim()).filter(Boolean),
+qty:+r.qty||0,
+unit:r.unit||"แผ่น",
+pallets:+r.pallets||0,
+problem:null,arriveTime:null,arriveTs:null,doneTime:null,doneTs:null
+}));
+if(t.stops){
+newStops.forEach((s,i)=>{
+if(t.stops[i]){
+s.problem=t.stops[i].problem;
+s.arriveTime=t.stops[i].arriveTime;s.arriveTs=t.stops[i].arriveTs;
+s.doneTime=t.stops[i].doneTime;s.doneTs=t.stops[i].doneTs;
+}
+});
+}
+t.stops=newStops;
+render();showDriver();renderReasonSection();
+apiSaveTruck(t);
+alert("บันทึกข้อมูลเที่ยวรถแล้ว — อัปเดตไปที่การ์ด Driver Mobile ให้อัตโนมัติ");
+}
+
+function uploadTrucksExcel(){
+let f=truckExcelInput.files[0];
+if(!f){alert("กรุณาเลือกไฟล์ Excel/CSV ก่อน");return}
+let reader=new FileReader();
+reader.onload=function(e){
+try{
+let data=new Uint8Array(e.target.result);
+let wb=XLSX.read(data,{type:"array"});
+let sheet=wb.Sheets[wb.SheetNames[0]];
+let rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+let plates=rows.map(r=>String(r&&r[0]!=null?r[0]:"").trim()).filter(Boolean);
+if(plates.length&&/ทะเบียน|plate|เลขทะเบียน/i.test(plates[0]))plates.shift();
+let added=0,skipped=0;
+plates.forEach(p=>{
+if(trucks.some(t=>t.id===p)){skipped++;return}
+let newT={id:p,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),
+verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
+history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}};
+trucks.push(newT);
+apiSaveTruck(newT);
+added++;
+});
+populate();render();
+truckExcelInput.value="";
+alert("อัปโหลดสำเร็จ ✅\nเพิ่มรถใหม่: "+added+" คัน"+(skipped?"\nข้ามเพราะซ้ำในระบบแล้ว: "+skipped+" คัน":""));
+}catch(err){
+alert("อ่านไฟล์ไม่สำเร็จ: "+err.message+"\nกรุณาตรวจสอบว่าเป็นไฟล์ .xlsx .xls หรือ .csv และมีทะเบียนรถอยู่ในคอลัมน์แรก");
+}
+};
+reader.readAsArrayBuffer(f);
+}
+
+function onTruckChange(){
+selected=+driverTruck.value;
+verifiedFor=null;
+showDriver();
+renderReasonSection();
+renderVerify();
+}
+
+function showDriver(){
+let i=+driverTruck.value,t=trucks[i];
+selected=i;
+let steps=stepsFor(t),curIdx=steps.indexOf(t.status);
+let stopsArr=t.stops&&t.stops.length?t.stops:[makeEmptyStop()];
+let activeStopIdx=currentStopIndex(t);
+let stopsListHtml=stopsArr.map((st,k)=>{
+let arriveIdx=5+k*2,doneIdx=5+k*2+1;
+let icon=curIdx>doneIdx?"✅":curIdx===doneIdx?"📦":curIdx===arriveIdx?"🚚":"⏳";
+return `<div class="small">${icon} จุดที่ ${k+1}: ${st.customer||'(ยังไม่ระบุลูกค้า)'} ${st.so&&st.so.length?'• SO: '+st.so.join(", "):''}</div>`;
+}).join("");
+let activeStop=(activeStopIdx>=0&&activeStopIdx<stopsArr.length)?stopsArr[activeStopIdx]:null;
+
+driverJob.innerHTML=`<div class="job">
+<b>🚚 ทะเบียนรถ:</b> ${t.id}<br>
+<b>👤 คนขับที่มอบหมาย:</b> ${t.assignedDriver||'<span class="muted">ยังไม่ระบุ</span>'}<br>
+<b>📍 2. แผนส่งสินค้า (${stopsArr.length} จุด):</b><br>${stopsListHtml}
+${activeStop?`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #d7dee8">
+<b>🏢 กำลังดำเนินการจุดที่ ${activeStopIdx+1}: ${activeStop.customer||'-'}</b><br>
+<b>📄 SO:</b> ${(activeStop.so||[]).join(", ")||'-'}<br>
+<b>📦 จำนวน:</b> ${(activeStop.qty||0).toLocaleString()} ${activeStop.unit||''}<br>
+<b>🟫 พาเลท:</b> ${activeStop.pallets||0}
+</div>`:''}
+<b>สถานะ:</b> <span class="badge ${truckHasProblem(t)?'red':cls(t.status)}">${t.status}</span>
+</div>`;
+
+let driverSteps=steps.slice(2);
+let pos=driverSteps.indexOf(t.status);
+let hasProblem=activeStop&&activeStop.problem;
+let h=renderStatusBar(t,driverSteps,pos);
+if(verifiedFor!==i){
+h+=`<div class="alert" style="margin-top:10px;background:#fff7ed;border-color:#fed7aa;color:#9a3412">🔒 กรุณายืนยันตัวตนในช่องที่ 4 ด้านล่างก่อน จึงจะกดเปลี่ยนสถานะได้</div>`;
+}else if(hasProblem){
+h+=`<div class="alert" style="margin-top:10px">⚠️ มีปัญหาค้างอยู่ที่จุดที่ ${activeStopIdx+1} — กรุณา "แก้ไขปัญหาแล้ว" ในช่องที่ 3 ก่อนดำเนินการขั้นตอนถัดไป</div>`;
+}else if(pos>=0&&pos<driverSteps.length-1){
+h+=`<button class="bigbtn next" style="margin-top:10px" onclick="driverUpdate('${driverSteps[pos+1]}')">➡️ ยืนยัน: ${driverSteps[pos+1]}</button>`;
+}else if(pos===driverSteps.length-1){
+h+=`<div class="alert" style="margin-top:10px;background:#dcfce7;border-color:#bbf7d0;color:#166534">✅ จบเที่ยวรถนี้แล้ว</div>`;
+}
+driverButtons.innerHTML=h;
+}
+
+function renderStatusBar(t,driverSteps,pos){
+return `<div>
+<label style="margin-bottom:2px">แถบสถานะเที่ยวรถ (บังคับกดทีละขั้นตอน)</label>
+<div style="display:flex;flex-wrap:wrap;gap:4px">
+${driverSteps.map((s,i)=>{
+let state=pos<0?"todo":(i<pos?"done":i===pos?"current":"todo");
+let bg=state==="done"?"#166534":state==="current"?"#1769aa":"#e2e8f0";
+let fg=state==="todo"?"#64748b":"#fff";
+return `<div style="flex:1 1 55px;text-align:center;min-width:48px">
+<div style="width:22px;height:22px;line-height:22px;border-radius:50%;background:${bg};color:${fg};font-weight:800;font-size:10px;margin:0 auto 3px">${state==="done"?"✓":i+1}</div>
+<div style="font-size:8px;color:${state==="current"?"#1769aa":"#94a3b8"};font-weight:${state==="current"?"800":"500"};line-height:1.2">${s}</div>
+</div>`;
+}).join("")}
+</div>
+${pos<0?'<p class="small" style="margin-top:8px">⏳ รอโรงงานบันทึก "โหลดสินค้าเสร็จแล้ว" ก่อนจึงจะเริ่มขั้นตอนขนส่งได้</p>':""}
+</div>`;
+}
+
+function driverUpdate(s){update(+driverTruck.value,s)}
+
+function renderReasonSection(){
+let i=+driverTruck.value,t=trucks[i];
+let stopsArr=t.stops&&t.stops.length?t.stops:[makeEmptyStop()];
+let activeStopIdx=currentStopIndex(t);
+if(activeStopIdx<0||activeStopIdx>=stopsArr.length){
+reasonSection.innerHTML='<p class="small">3. ยังไม่ถึงขั้นตอนที่ต้องรายงานปัญหาการลงสินค้า</p>';
+return;
+}
+let st=stopsArr[activeStopIdx];
+if(st.problem){
+reasonSection.innerHTML=`<div class="alert"><b>⚠️ สาเหตุที่บันทึกไว้ (จุดที่ ${activeStopIdx+1}: ${st.customer||'-'}):</b> ${st.problem}<br>
+<button class="primary" style="width:100%;margin-top:8px" onclick="resolveProblem(${i})">✓ แก้ไขปัญหาแล้ว</button></div>`;
+return;
+}
+reasonSection.innerHTML=`<label>3. สาเหตุที่ลงสินค้าไม่ได้ (จุดที่ ${activeStopIdx+1}: ${st.customer||'-'}) ถ้ามี</label>
+<select id="reasonSelect" onchange="onReasonChange()">
+<option value="">-- ไม่มีปัญหา --</option>
+${reasons.map(r=>`<option>${r}</option>`).join("")}
+</select>
+<div id="reasonCustomBox" style="display:none">
+<input id="reasonCustomText" placeholder="พิมพ์รายละเอียดสาเหตุ">
+</div>
+<button class="primary" style="width:100%" onclick="submitReason(${i})">บันทึกสาเหตุ</button>`;
+}
+
+function onReasonChange(){
+reasonCustomBox.style.display=reasonSelect.value==="อื่นๆ"?"block":"none";
+}
+
+function submitReason(i){
+if(verifiedFor!==i){alert("กรุณายืนยันตัวตนคนขับ (ช่องที่ 4) ก่อนบันทึกสาเหตุ");return}
+let t=trucks[i],stopsArr=t.stops&&t.stops.length?t.stops:[makeEmptyStop()];
+let activeStopIdx=currentStopIndex(t);
+if(activeStopIdx<0||activeStopIdx>=stopsArr.length){alert("ยังไม่ถึงจุดส่งสินค้าที่จะรายงานปัญหาได้");return}
+let val=reasonSelect.value;
+if(!val){alert("กรุณาเลือกสาเหตุ");return}
+if(val==="อื่นๆ"){
+let txt=reasonCustomText.value.trim();
+if(!txt){alert("กรุณาระบุรายละเอียดสาเหตุ");return}
+stopsArr[activeStopIdx].problem="อื่นๆ: "+txt;
+}else stopsArr[activeStopIdx].problem=val;
+t.time=now();
+render();showDriver();renderReasonSection();
+}
+
+function resolveProblem(i){
+let t=trucks[i],activeStopIdx=currentStopIndex(t);
+if(activeStopIdx>=0&&t.stops[activeStopIdx])t.stops[activeStopIdx].problem=null;
+t.time=now();
+render();showDriver();renderReasonSection();
+}
+
+function renderStaffManager(){
+return `<div class="panel" style="padding:10px 12px;margin-bottom:10px;background:#f8fafc;box-shadow:none;border:1px solid #e5eaf1">
+<b class="small">จัดการรายชื่อพนักงานขับรถ</b>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">
+${staffList.length?staffList.map((n,idx)=>`<span class="pill">${n}<span onclick="removeStaff(${idx})">×</span></span>`).join(""):'<span class="muted">ยังไม่มีรายชื่อ</span>'}
+</div>
+<div class="row">
+<input id="newStaffName" placeholder="ชื่อพนักงานใหม่">
+<button type="button" class="primary" style="width:auto;padding:10px 14px" onclick="addStaff()">+ เพิ่ม</button>
+</div>
+</div>`;
+}
+
+function addStaff(){
+let n=newStaffName.value.trim();
+if(!n)return;
+if(staffList.includes(n)){alert("มีชื่อนี้อยู่แล้ว");return}
+staffList.push(n);
+renderVerify();
+populateAdminDriverSelect();
+}
+
+function removeStaff(idx){
+let name=staffList[idx];
+if(!confirm('ลบพนักงาน "'+name+'" ออกจากรายชื่อ?'))return;
+staffList.splice(idx,1);
+let i=+driverTruck.value;
+if(trucks[i]&&trucks[i].verifiedDriver===name){
+trucks[i].verifiedDriver=null;trucks[i].verifiedTime=null;trucks[i].verifiedPhoto=null;
+if(verifiedFor===i)verifiedFor=null;
+render();showDriver();
+}
+trucks.forEach(t=>{if(t.assignedDriver===name)t.assignedDriver=null});
+renderVerify();
+populateAdminDriverSelect();
+}
+
+let pendingPhoto=null,camStream=null;
+
+function renderVerify(){
+let i=+driverTruck.value,t=trucks[i];
+pendingPhoto=null;
+let manager=renderStaffManager();
+if(verifiedFor===i){
+driverVerify.innerHTML=manager+`<div class="alert" style="background:#dcfce7;border-color:#bbf7d0;color:#166534">
+✅ ยืนยันตัวตนแล้ว: <b>${t.verifiedDriver}</b> • เวลา ${t.verifiedTime}
+${t.verifiedPhoto?`<div><img src="${t.verifiedPhoto}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid #bbf7d0"></div>`:''}
+<button class="reason" style="margin-top:8px" onclick="changeDriver()">↺ เปลี่ยนผู้ขับ / ยืนยันใหม่</button>
+</div>`;
+return;
+}
+driverVerify.innerHTML=manager+`<label>4. ยืนยันตัวตนกับรถที่ขับวันนี้</label>
+${staffList.length?`<select id="staffSelect">${staffList.map(n=>`<option>${n}</option>`).join("")}</select>
+<div style="margin:8px 0">
+<video id="camVideo" autoplay playsinline muted style="width:100%;max-width:220px;display:none;border-radius:8px;background:#000"></video>
+<canvas id="camCanvas" style="display:none"></canvas>
+<img id="camPreview" style="width:90px;height:90px;object-fit:cover;border-radius:8px;display:none;margin-bottom:8px">
+<button type="button" class="reason" id="startCamBtn" style="text-align:center;font-weight:700" onclick="startCamera()">📷 เปิดกล้องเพื่อถ่ายรูปยืนยัน</button>
+<button type="button" class="reason" id="captureBtn" style="text-align:center;font-weight:700;display:none" onclick="capturePhoto()">📸 ถ่ายรูป</button>
+</div>
+<button class="primary" style="width:100%" id="confirmVerifyBtn" onclick="verifyDriver()" disabled>✓ ยืนยันตัวตน (ต้องถ่ายรูปก่อน)</button>`
+:'<p class="small">กรุณาเพิ่มรายชื่อพนักงานก่อนยืนยันตัวตน</p>'}`;
+}
+
+function startCamera(){
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+alert("อุปกรณ์นี้ไม่รองรับการเปิดกล้องผ่านเบราว์เซอร์");return;
+}
+navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}}).then(stream=>{
+camStream=stream;
+let v=document.getElementById("camVideo");
+v.srcObject=stream;v.style.display="block";
+document.getElementById("startCamBtn").style.display="none";
+document.getElementById("captureBtn").style.display="block";
+}).catch(err=>{
+alert("เปิดกล้องไม่ได้: "+err.message+"\nกรุณาอนุญาตการใช้กล้องในเบราว์เซอร์ก่อน (ต้องเปิดผ่าน HTTPS หรือ localhost)");
+});
+}
+
+function capturePhoto(){
+let v=document.getElementById("camVideo"),c=document.getElementById("camCanvas");
+let maxDim=280;
+let vw=v.videoWidth||320,vh=v.videoHeight||240;
+let scale=Math.min(1,maxDim/Math.max(vw,vh));
+c.width=Math.round(vw*scale);c.height=Math.round(vh*scale);
+c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+pendingPhoto=c.toDataURL("image/jpeg",0.6);
+let img=document.getElementById("camPreview");
+img.src=pendingPhoto;img.style.display="block";
+v.style.display="none";
+document.getElementById("captureBtn").style.display="none";
+if(camStream){camStream.getTracks().forEach(tr=>tr.stop());camStream=null}
+let btn=document.getElementById("confirmVerifyBtn");
+btn.disabled=false;btn.textContent="✓ ยืนยันตัวตน";
+}
+
+function verifyDriver(){
+if(!pendingPhoto){alert("กรุณาถ่ายรูปยืนยันตัวตนก่อน");return}
+let i=+driverTruck.value;
+trucks[i].verifiedDriver=staffSelect.value;
+trucks[i].verifiedTime=now();
+trucks[i].verifiedPhoto=pendingPhoto;
+pendingPhoto=null;
+verifiedFor=i;
+renderVerify();showDriver();render();
+apiSaveTruck(trucks[i]);
+}
+
+function changeDriver(){
+verifiedFor=null;
+renderVerify();showDriver();
+}
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+b.classList.add("active");document.getElementById(b.dataset.page).classList.add("active");
+if(b.dataset.page==="admin"){loadJob();onAdminTruckChange();}
+if(b.dataset.page==="driver")onTruckChange();
+if(b.dataset.page==="report")renderReport();
+});
+
+setInterval(()=>clock.textContent=now(),1000);
+populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
+initFromServer();
+</script>
+</body></html>
