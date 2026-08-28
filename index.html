@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V19</title>
+<title>Transport Real-Time Control V20</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V19 • Dashboard อัปเดตข้อมูลอัตโนมัติทุก 20 วินาที ไม่ต้องกด F5</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V20 • Driver Mobile อัปเดตสถานะสดจาก Admin โดยไม่ต้องรีเฟรช</div></div>
 <div id="clock"></div>
 </header>
 
@@ -1001,6 +1001,10 @@ res.staff.forEach(n=>{if(!staffList.includes(n))staffList.push(n);});
 }
 render();
 populateAdminDriverSelect();
+// อัปเดตข้อมูลงาน/แถบสถานะในหน้า Driver Mobile ให้เห็นการเปลี่ยนแปลงจาก Admin ทันที
+// โดยไม่แตะช่องยืนยันตัวตน (กล้อง/รูปที่ถ่ายค้างไว้) หรือช่องพิมพ์สาเหตุที่ยังไม่ได้กดบันทึก
+// เพื่อไม่ให้ข้อมูลที่กำลังทำอยู่หายไปกลางคัน
+showDriver();
 }catch(err){
 console.warn("พื้นหลัง: เช็คข้อมูลใหม่จากเซิร์ฟเวอร์ไม่สำเร็จ",err);
 }
