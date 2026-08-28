@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V16</title>
+<title>Transport Real-Time Control V17</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V16 • ค้นหารถด้วยเลข SO อันไหนก็ได้ในเที่ยวงาน</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V17 • แก้บั๊กยืนยันตัวตนซ้ำ • เพิ่มประเภทรถ+วันที่ในรายงาน</div></div>
 <div id="clock"></div>
 </header>
 
@@ -53,7 +53,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <div class="grid">
 <div class="panel">
 <h2>สถานะรถทั้งหมด</h2><div id="alerts"></div>
-<table><thead><tr><th>รถ</th><th>คนขับ</th><th>รูป</th><th>ลูกค้า (ตามลำดับจุดส่ง)</th><th>SO</th><th>สถานะปัจจุบัน</th><th>เวลา</th></tr></thead>
+<table><thead><tr><th>รถ</th><th>ประเภท</th><th>คนขับ</th><th>รูป</th><th>ลูกค้า (ตามลำดับจุดส่ง)</th><th>SO</th><th>สถานะปัจจุบัน</th><th>เวลา</th></tr></thead>
 <tbody id="fleet"></tbody></table>
 </div>
 <div class="panel"><h2>Timeline เที่ยวรถ</h2><div id="timeline" class="timeline"></div></div>
@@ -71,7 +71,13 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <label>ทะเบียนรถ</label><select id="adminTruck" onchange="onAdminTruckChange()"></select>
 <div class="row" style="margin:-4px 0 12px">
 <input id="newPlateInput" placeholder="เพิ่มทะเบียนรถใหม่ เช่น 70-9999">
+<input id="newTypeInput" placeholder="ประเภทรถ (ถ้ามี)" style="max-width:140px">
 <button type="button" class="primary" style="width:auto;padding:10px 14px;white-space:nowrap" onclick="addTruck()">+ เพิ่มรถ</button>
+</div>
+<label>ประเภทรถของคันที่เลือก</label>
+<div class="row" style="margin:-4px 0 12px">
+<input id="editTypeInput" placeholder="เช่น 6 ล้อ, 4 ล้อผ้าใบ, กระบะ">
+<button type="button" class="primary" style="width:auto;padding:10px 14px;white-space:nowrap" onclick="saveTruckType()">บันทึก</button>
 </div>
 <button type="button" class="reason" style="text-align:center;font-weight:700;color:#b91c1c;border-color:#fecdd3" onclick="removeTruck()">🗑 ลบทะเบียนรถนี้ออกจากระบบ (รถออกจากกองยานถาวร)</button>
 <div id="adminTruckInfo" class="small" style="margin:-4px 0 12px;padding:8px 10px;background:#f8fafc;border-radius:8px"></div>
@@ -80,7 +86,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <label>📥 อัปโหลดทะเบียนรถจากไฟล์ Excel/CSV (เพิ่มทีเดียวหลายคัน)</label>
 <input type="file" id="truckExcelInput" accept=".xlsx,.xls,.csv">
 <button type="button" class="primary" style="width:100%" onclick="uploadTrucksExcel()">อัปโหลดและเพิ่มรถทั้งหมด</button>
-<p class="small" style="margin-top:6px">ไฟล์ต้องมีทะเบียนรถอยู่ใน<b>คอลัมน์แรก (A)</b> แถวละ 1 คัน จะมีหัวตาราง หรือไม่มีก็ได้ ระบบจะข้ามทะเบียนที่ซ้ำให้อัตโนมัติ</p>
+<p class="small" style="margin-top:6px">รองรับ 2 รูปแบบ: (1) ไฟล์ง่ายๆ มีแค่คอลัมน์ทะเบียนรถอย่างเดียว หรือ (2) ไฟล์ที่มีหัวตาราง "ทะเบียน", "ชื่อพนักงานขับรถ", "ประเภทรถ" — ระบบจะอ่านครบทั้งทะเบียน ประเภทรถ และเพิ่มชื่อพนักงานเข้ารายชื่อให้อัตโนมัติ ข้ามรายการที่ซ้ำในระบบให้เอง</p>
 </div>
 <label>ชื่อพนักงานขับรถ (มอบหมายเที่ยวนี้)</label>
 <input list="staffDatalist" id="adminDriverSelect" placeholder="พิมพ์ชื่อพนักงาน แล้วเลือกจากรายการที่ขึ้นมา" autocomplete="off">
@@ -121,7 +127,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <div style="overflow-x:auto">
 <table id="reportTable">
 <thead><tr>
-<th>รถ</th><th>คนขับ</th><th>รูป</th><th>ลูกค้าที่ส่ง (ตามลำดับ)</th>
+<th>วันที่</th><th>รถ</th><th>ประเภท</th><th>คนขับ</th><th>รูป</th><th>ลูกค้าที่ส่ง (ตามลำดับ)</th>
 <th>เตรียมสินค้า</th><th>ตรวจนับ</th><th>โหลดเสร็จ</th><th>เปิดบิล</th><th>ออกจากบริษัท</th>
 <th>ถึงจุด 1</th><th>เสร็จจุด 1</th><th>ถึงจุด 2</th><th>เสร็จจุด 2</th><th>ถึงจุด 3</th><th>เสร็จจุด 3</th>
 <th>เริ่มกลับ</th><th>ถึงบริษัท</th>
@@ -178,6 +184,7 @@ pallets:10+(i%10)
 })],
 status:FACTORY_STEPS[Math.min(i%9,3)],
 time:"07:"+String(10+i%45).padStart(2,"0"),
+type:"",
 verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,
 assignedDriver:null,
 history:{}
@@ -289,6 +296,7 @@ let soList=(t.stops||[]).map(s=>(s.so||[]).join(",")).filter(Boolean).join(" | "
 let mismatch=t.assignedDriver&&t.verifiedDriver&&t.assignedDriver!==t.verifiedDriver;
 return `<tr onclick="selectTruck(${i})" style="cursor:pointer">
 <td><b>${t.id}</b><br><span class="muted">${t.assignedDriver?"มอบหมาย: "+t.assignedDriver:""}</span></td>
+<td>${t.type||'<span class="muted">-</span>'}</td>
 <td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?'<div style="color:#b91c1c;font-weight:700">⚠️ ไม่ตรงกับที่มอบหมาย</div>':''}`:'<span class="muted">ยังไม่ยืนยัน</span>'}</td>
 <td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="event.stopPropagation();showPhotoModal('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
 <td>${custList}</td>
@@ -332,7 +340,9 @@ stopCells+=`<td><span class="muted">-</span></td><td><span class="muted">-</span
 }
 }
 let tailCells=["รถกำลังกลับบริษัท","รถถึงบริษัทแล้ว"].map(s=>`<td>${h[s]?h[s].time:'<span class="muted">-</span>'}</td>`).join("");
-return `<tr><td><b>${t.id}</b></td>
+let latestTs=Math.max(0,...Object.values(h).map(x=>x.ts||0));
+let dateStr=latestTs?new Date(latestTs).toLocaleDateString("th-TH",{day:"2-digit",month:"2-digit",year:"numeric"}):'<span class="muted">-</span>';
+return `<tr><td>${dateStr}</td><td><b>${t.id}</b></td><td>${t.type||'<span class="muted">-</span>'}</td>
 <td>${t.verifiedDriver?`${t.verifiedDriver}${mismatch?' <span style="color:#b91c1c;font-weight:700">⚠️</span>':''}`:'<span class="muted">-</span>'}</td>
 <td>${t.verifiedPhoto?`<img src="${t.verifiedPhoto}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;cursor:pointer" onclick="showPhotoModal('${t.verifiedPhoto}')" title="คลิกดูรูปขยาย">`:'<span class="muted">-</span>'}</td>
 <td>${custList}</td>${baseCells}${stopCells}${tailCells}</tr>`;
@@ -343,8 +353,11 @@ function exportReportExcel(){
 if(typeof XLSX==="undefined"){alert("ไม่สามารถโหลดไลบรารี Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่");return}
 let rows=trucks.map(t=>{
 let h=t.history||{},stopsArr=t.stops||[];
+let latestTs=Math.max(0,...Object.values(h).map(x=>x.ts||0));
 let row={
+"วันที่":latestTs?new Date(latestTs).toLocaleDateString("th-TH",{day:"2-digit",month:"2-digit",year:"numeric"}):"",
 "ทะเบียนรถ":t.id,
+"ประเภทรถ":t.type||"",
 "คนขับที่ยืนยัน":t.verifiedDriver||"",
 "คนขับที่มอบหมาย":t.assignedDriver||"",
 "ตรงกันหรือไม่":t.verifiedDriver?(t.assignedDriver&&t.assignedDriver!==t.verifiedDriver?"ไม่ตรงกัน":"ตรงกัน"):"",
@@ -380,12 +393,14 @@ if(cur.adminTruck)document.getElementById("adminTruck").value=cur.adminTruck;
 
 function addTruck(){
 let plate=newPlateInput.value.trim();
+let type=newTypeInput.value.trim();
 if(!plate){alert("กรุณาระบุทะเบียนรถ");return}
 if(trucks.some(t=>t.id===plate)){alert("มีทะเบียนรถนี้อยู่ในระบบแล้ว");return}
-trucks.push({id:plate,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),
+trucks.push({id:plate,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),type:type,
 verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
 history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}});
 newPlateInput.value="";
+newTypeInput.value="";
 populate();
 adminTruck.value=trucks.length-1;
 render();
@@ -505,11 +520,23 @@ soSearchInput.placeholder="✓ พบรถ "+trucks[idx].id+" จาก SO: "+q
 function onAdminTruckChange(){
 let t=trucks[+adminTruck.value];
 if(t&&t.assignedDriver&&staffList.includes(t.assignedDriver))adminDriverSelect.value=t.assignedDriver;
+if(document.getElementById("editTypeInput"))editTypeInput.value=t?(t.type||""):"";
 let infoBox=document.getElementById("adminTruckInfo");
 if(infoBox&&t){
-infoBox.innerHTML="<b>เที่ยวงานปัจจุบันของรถนี้:</b><br>"+tripSummary(t).replace(/\n/g,"<br>")+
+infoBox.innerHTML="<b>ประเภทรถ:</b> "+(t.type||'<span class="muted">ยังไม่ระบุ</span>')+"<br>"+
+"<b>เที่ยวงานปัจจุบันของรถนี้:</b><br>"+tripSummary(t).replace(/\n/g,"<br>")+
 (t.verifiedDriver?"<br><b>ยืนยันตัวตนโดย:</b> "+t.verifiedDriver:"<br><span class=\"muted\">ยังไม่มีการยืนยันตัวตน</span>");
 }
+}
+
+function saveTruckType(){
+let t=trucks[+adminTruck.value];
+if(!t)return;
+t.type=editTypeInput.value.trim();
+onAdminTruckChange();
+render();
+apiSaveTruck(t);
+alert("บันทึกประเภทรถของ "+t.id+" แล้ว");
 }
 
 function renderStopsRows(list){
@@ -596,31 +623,77 @@ let data=new Uint8Array(e.target.result);
 let wb=XLSX.read(data,{type:"array"});
 let sheet=wb.Sheets[wb.SheetNames[0]];
 let rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+
+// หาแถวหัวตาราง (header) โดยดูว่ามีคำว่า "ทะเบียน" อยู่ในแถวไหน รองรับไฟล์ที่มีแถวชื่อเรื่องด้านบนก่อนหัวตาราง
+let headerRowIdx=-1,plateCol=-1,driverCol=-1,typeCol=-1;
+for(let i=0;i<Math.min(rows.length,10);i++){
+let r=rows[i]||[];
+let pc=r.findIndex(c=>/^ทะเบียน|^plate|เลขทะเบียน/i.test(String(c||"").trim()));
+if(pc>=0){
+headerRowIdx=i;plateCol=pc;
+driverCol=r.findIndex(c=>/ชื่อพนักงาน|คนขับ|driver/i.test(String(c||"")));
+typeCol=r.findIndex(c=>/ประเภทรถ|ประเภท|type/i.test(String(c||"")));
+break;
+}
+}
+
+let added=0,skipped=0,staffAdded=0;
+if(headerRowIdx>=0){
+// รูปแบบมีหัวตาราง: ทะเบียน / ชื่อพนักงานขับรถ / ประเภทรถ (ตามไฟล์จริงของบริษัท)
+for(let i=headerRowIdx+1;i<rows.length;i++){
+let r=rows[i]||[];
+let plate=String(r[plateCol]!=null?r[plateCol]:"").trim();
+if(!plate)continue;
+let driverName=driverCol>=0?String(r[driverCol]!=null?r[driverCol]:"").trim():"";
+let type=typeCol>=0?String(r[typeCol]!=null?r[typeCol]:"").trim():"";
+if(driverName&&!staffList.includes(driverName)){
+staffList.push(driverName);
+apiAddStaff(driverName);
+staffAdded++;
+}
+if(trucks.some(t=>t.id===plate)){
+skipped++;
+if(type){let ex=trucks.find(t=>t.id===plate);if(ex&&!ex.type){ex.type=type;apiSaveTruck(ex);}}
+continue;
+}
+let newT={id:plate,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),type:type,
+verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
+history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}};
+trucks.push(newT);
+apiSaveTruck(newT);
+added++;
+}
+}else{
+// รูปแบบง่าย: คอลัมน์แรกเป็นทะเบียนรถอย่างเดียว ไม่มีหัวตาราง
 let plates=rows.map(r=>String(r&&r[0]!=null?r[0]:"").trim()).filter(Boolean);
-if(plates.length&&/ทะเบียน|plate|เลขทะเบียน/i.test(plates[0]))plates.shift();
-let added=0,skipped=0;
 plates.forEach(p=>{
 if(trucks.some(t=>t.id===p)){skipped++;return}
-let newT={id:p,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),
+let newT={id:p,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),type:"",
 verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
 history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}};
 trucks.push(newT);
 apiSaveTruck(newT);
 added++;
 });
-populate();render();
+}
+
+populate();render();populateAdminDriverSelect();
 truckExcelInput.value="";
-alert("อัปโหลดสำเร็จ ✅\nเพิ่มรถใหม่: "+added+" คัน"+(skipped?"\nข้ามเพราะซ้ำในระบบแล้ว: "+skipped+" คัน":""));
+let msg="อัปโหลดสำเร็จ ✅\nเพิ่มรถใหม่: "+added+" คัน";
+if(skipped)msg+="\nข้ามเพราะซ้ำในระบบแล้ว: "+skipped+" คัน";
+if(staffAdded)msg+="\nเพิ่มรายชื่อพนักงานใหม่: "+staffAdded+" คน";
+alert(msg);
 }catch(err){
-alert("อ่านไฟล์ไม่สำเร็จ: "+err.message+"\nกรุณาตรวจสอบว่าเป็นไฟล์ .xlsx .xls หรือ .csv และมีทะเบียนรถอยู่ในคอลัมน์แรก");
+alert("อ่านไฟล์ไม่สำเร็จ: "+err.message+"\nกรุณาตรวจสอบไฟล์ Excel/CSV");
 }
 };
 reader.readAsArrayBuffer(f);
 }
 
 function onTruckChange(){
-selected=+driverTruck.value;
-verifiedFor=null;
+let newSelected=+driverTruck.value;
+if(newSelected!==selected)verifiedFor=null;
+selected=newSelected;
 showDriver();
 renderReasonSection();
 renderVerify();
