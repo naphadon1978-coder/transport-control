@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V18</title>
+<title>Transport Real-Time Control V19</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V18 • แก้บั๊กอัปโหลดหลายรายการ ข้อมูลไม่หลุดหายไปที่ Sheets แล้ว</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V19 • Dashboard อัปเดตข้อมูลอัตโนมัติทุก 20 วินาที ไม่ต้องกด F5</div></div>
 <div id="clock"></div>
 </header>
 
@@ -982,5 +982,29 @@ if(b.dataset.page==="report")renderReport();
 setInterval(()=>clock.textContent=now(),1000);
 populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
 initFromServer();
+
+// ดึงข้อมูลใหม่จากเซิร์ฟเวอร์เป็นระยะๆ อัตโนมัติ (สำหรับจอ Dashboard ที่เปิดค้างไว้)
+// อัปเดตเฉพาะ trucks/staffList + เรียก render() เท่านั้น ไม่แตะหน้า Driver Mobile
+// ที่กำลังทำรายการอยู่ (เช่น ถ่ายรูปยืนยันตัวตนค้าง) เพื่อไม่ให้ข้อมูลที่พิมพ์ค้างหาย
+async function pollForUpdates(){
+try{
+let res=await apiGetTrucks();
+if(res&&res.ok&&Array.isArray(res.trucks)){
+res.trucks.forEach(serverT=>{
+let idx=trucks.findIndex(t=>t.id===serverT.id);
+if(idx>=0)trucks[idx]=serverT;
+else trucks.push(serverT);
+});
+}
+if(res&&res.ok&&Array.isArray(res.staff)){
+res.staff.forEach(n=>{if(!staffList.includes(n))staffList.push(n);});
+}
+render();
+populateAdminDriverSelect();
+}catch(err){
+console.warn("พื้นหลัง: เช็คข้อมูลใหม่จากเซิร์ฟเวอร์ไม่สำเร็จ",err);
+}
+}
+setInterval(pollForUpdates,20000);
 </script>
 </body></html>
