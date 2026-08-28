@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V20</title>
+<title>Transport Real-Time Control V21</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V20 • Driver Mobile อัปเดตสถานะสดจาก Admin โดยไม่ต้องรีเฟรช</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V21 • ปุ่มบันทึกสถานะมีเช็คถูกยืนยันให้เห็นชัดเจนแล้ว</div></div>
 <div id="clock"></div>
 </header>
 
@@ -95,7 +95,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <select id="adminStatus">
 <option>เตรียมสินค้าแล้ว</option><option>ตรวจนับสินค้าแล้ว</option><option>โหลดสินค้าเสร็จแล้ว</option><option>เปิดบิลแล้ว</option>
 </select>
-<button class="primary" onclick="adminUpdate()">บันทึกสถานะ</button>
+<button class="primary" id="adminSaveStatusBtn" onclick="adminUpdate()">บันทึกสถานะ</button>
 </div>
 
 <div class="panel">
@@ -472,6 +472,22 @@ return;
 trucks[i].assignedDriver=typed;
 }
 update(i,adminStatus.value);
+flashSaveConfirm("adminSaveStatusBtn","✓ บันทึกสถานะแล้ว");
+}
+
+function flashSaveConfirm(btnId,confirmText){
+let btn=document.getElementById(btnId);
+if(!btn)return;
+if(btn.dataset.flashing)return; // กันกดรัวๆ ระหว่างที่ยังโชว์ข้อความเดิมค้างอยู่
+btn.dataset.flashing="1";
+let original=btn.textContent,origBg=btn.style.background;
+btn.textContent=confirmText;
+btn.style.background="#166534";
+setTimeout(()=>{
+btn.textContent=original;
+btn.style.background=origBg;
+delete btn.dataset.flashing;
+},1200);
 }
 
 function populateAdminDriverSelect(){
