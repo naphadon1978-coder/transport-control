@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V21</title>
+<title>Transport Real-Time Control V22</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V21 • ปุ่มบันทึกสถานะมีเช็คถูกยืนยันให้เห็นชัดเจนแล้ว</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V22 • จำแท็บและการยืนยันตัวตนของวันเดียวกัน ไม่หายเมื่อรีเฟรช/รีโหลด</div></div>
 <div id="clock"></div>
 </header>
 
@@ -436,7 +436,7 @@ if(!t.verifiedDriver&&!t.verifiedPhoto){alert("รถคันนี้ยัง
 let pin=prompt('ยืนยันตัวตน (ชื่อ+รูป) ของรถ "'+t.id+'" — คนขับปัจจุบัน: '+(t.verifiedDriver||'-')+'\n\nเที่ยวงานนี้:\n'+tripSummary(t)+'\n\nการลบนี้ย้อนกลับไม่ได้ กรุณากรอกรหัสเพื่อยืนยัน:');
 if(pin===null)return;
 if(pin!=="NK2521"){alert("รหัสไม่ถูกต้อง ยกเลิกการลบ");return}
-t.verifiedDriver=null;t.verifiedTime=null;t.verifiedPhoto=null;
+t.verifiedDriver=null;t.verifiedTime=null;t.verifiedTs=null;t.verifiedPhoto=null;
 let di=+driverTruck.value;
 if(verifiedFor===di&&di===i)verifiedFor=null;
 render();showDriver();renderVerify();onAdminTruckChange();
@@ -718,10 +718,19 @@ alert("อ่านไฟล์ไม่สำเร็จ: "+err.message+"\nก
 reader.readAsArrayBuffer(f);
 }
 
+function isVerifiedToday(t){
+if(!t||!t.verifiedTs)return false;
+let d=new Date(t.verifiedTs),n=new Date();
+return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+}
+
 function onTruckChange(){
 let newSelected=+driverTruck.value;
-if(newSelected!==selected)verifiedFor=null;
 selected=newSelected;
+// ถ้ารถคันนี้เคยยืนยันตัวตนไว้แล้ว "วันนี้" (ไม่ว่าจะจากเซสชันนี้หรือถูกโหลดใหม่มาจากเซิร์ฟเวอร์
+// หลัง refresh/มือถือรีโหลดหน้าเองตอนสลับแอป) ให้ถือว่ายังยืนยันตัวตนอยู่ ไม่ต้องถ่ายรูปซ้ำ
+// แต่ถ้าเป็นการยืนยันจากวันก่อนหน้า (ข้ามวันมาแล้ว) ต้องยืนยันใหม่เพื่อความปลอดภัย
+verifiedFor=isVerifiedToday(trucks[newSelected])?newSelected:null;
 showDriver();
 renderReasonSection();
 renderVerify();
@@ -885,7 +894,7 @@ staffList.splice(idx,1);
 apiRemoveStaff(name);
 let i=+driverTruck.value;
 if(trucks[i]&&trucks[i].verifiedDriver===name){
-trucks[i].verifiedDriver=null;trucks[i].verifiedTime=null;trucks[i].verifiedPhoto=null;
+trucks[i].verifiedDriver=null;trucks[i].verifiedTime=null;trucks[i].verifiedTs=null;trucks[i].verifiedPhoto=null;
 if(verifiedFor===i)verifiedFor=null;
 render();showDriver();
 }
@@ -965,6 +974,7 @@ return;
 let i=+driverTruck.value;
 trucks[i].verifiedDriver=typed;
 trucks[i].verifiedTime=now();
+trucks[i].verifiedTs=Date.now();
 trucks[i].verifiedPhoto=pendingPhoto;
 pendingPhoto=null;
 verifiedFor=i;
@@ -986,18 +996,29 @@ function closePhotoModal(){
 photoModal.classList.remove("show");
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+function switchToTab(pageId){
+let btn=document.querySelector('.tab[data-page="'+pageId+'"]');
+if(!btn)return;
 document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
 document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-b.classList.add("active");document.getElementById(b.dataset.page).classList.add("active");
-if(b.dataset.page==="admin"){loadJob();onAdminTruckChange();}
-if(b.dataset.page==="driver")onTruckChange();
-if(b.dataset.page==="report")renderReport();
+btn.classList.add("active");document.getElementById(pageId).classList.add("active");
+if(pageId==="admin"){loadJob();onAdminTruckChange();}
+if(pageId==="driver")onTruckChange();
+if(pageId==="report")renderReport();
+try{localStorage.setItem("activeTab",pageId);}catch(e){}
+}
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+switchToTab(b.dataset.page);
 });
 
 setInterval(()=>clock.textContent=now(),1000);
 populate();loadJob();render();onTruckChange();populateAdminDriverSelect();onAdminTruckChange();
 initFromServer();
+try{
+let savedTab=localStorage.getItem("activeTab");
+if(savedTab&&document.getElementById(savedTab))switchToTab(savedTab);
+}catch(e){}
 
 // ดึงข้อมูลใหม่จากเซิร์ฟเวอร์เป็นระยะๆ อัตโนมัติ (สำหรับจอ Dashboard ที่เปิดค้างไว้)
 // อัปเดตเฉพาะ trucks/staffList + เรียก render() เท่านั้น ไม่แตะหน้า Driver Mobile
