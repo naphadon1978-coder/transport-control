@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V17</title>
+<title>Transport Real-Time Control V18</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V17 • แก้บั๊กยืนยันตัวตนซ้ำ • เพิ่มประเภทรถ+วันที่ในรายงาน</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V18 • แก้บั๊กอัปโหลดหลายรายการ ข้อมูลไม่หลุดหายไปที่ Sheets แล้ว</div></div>
 <div id="clock"></div>
 </header>
 
@@ -241,6 +241,9 @@ return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"addStaff",name:
 }
 function apiRemoveStaff(name){
 return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"removeStaff",name:name})}).catch(err=>console.warn("sync (removeStaff) failed:",err));
+}
+function apiBulkImport(trucksArr,staffArr){
+return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"bulkImport",trucks:trucksArr,staff:staffArr})}).catch(err=>console.warn("sync (bulkImport) failed:",err));
 }
 
 async function initFromServer(){
@@ -638,6 +641,8 @@ break;
 }
 
 let added=0,skipped=0,staffAdded=0;
+let newTrucksForApi=[],newStaffForApi=[],updatedTrucksForApi=[];
+
 if(headerRowIdx>=0){
 // รูปแบบมีหัวตาราง: ทะเบียน / ชื่อพนักงานขับรถ / ประเภทรถ (ตามไฟล์จริงของบริษัท)
 for(let i=headerRowIdx+1;i<rows.length;i++){
@@ -648,19 +653,19 @@ let driverName=driverCol>=0?String(r[driverCol]!=null?r[driverCol]:"").trim():""
 let type=typeCol>=0?String(r[typeCol]!=null?r[typeCol]:"").trim():"";
 if(driverName&&!staffList.includes(driverName)){
 staffList.push(driverName);
-apiAddStaff(driverName);
+newStaffForApi.push(driverName);
 staffAdded++;
 }
 if(trucks.some(t=>t.id===plate)){
 skipped++;
-if(type){let ex=trucks.find(t=>t.id===plate);if(ex&&!ex.type){ex.type=type;apiSaveTruck(ex);}}
+if(type){let ex=trucks.find(t=>t.id===plate);if(ex&&!ex.type){ex.type=type;updatedTrucksForApi.push(ex);}}
 continue;
 }
 let newT={id:plate,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),type:type,
 verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
 history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}};
 trucks.push(newT);
-apiSaveTruck(newT);
+newTrucksForApi.push(newT);
 added++;
 }
 }else{
@@ -672,13 +677,20 @@ let newT={id:p,stops:[makeEmptyStop()],status:FACTORY_STEPS[0],time:now(),type:"
 verifiedDriver:null,verifiedTime:null,verifiedPhoto:null,assignedDriver:null,
 history:{[FACTORY_STEPS[0]]:{time:now(),ts:Date.now()}}};
 trucks.push(newT);
-apiSaveTruck(newT);
+newTrucksForApi.push(newT);
 added++;
 });
 }
 
 populate();render();populateAdminDriverSelect();
 truckExcelInput.value="";
+
+// ส่งข้อมูลทั้งหมดไปบันทึกที่ Google Sheets เป็นก้อนเดียวรวดเดียว (กันปัญหายิงพร้อมกันหลายสิบ request แล้วบางอันหลุดหาย)
+let allTrucksForApi=newTrucksForApi.concat(updatedTrucksForApi);
+if(allTrucksForApi.length||newStaffForApi.length){
+apiBulkImport(allTrucksForApi,newStaffForApi);
+}
+
 let msg="อัปโหลดสำเร็จ ✅\nเพิ่มรถใหม่: "+added+" คัน";
 if(skipped)msg+="\nข้ามเพราะซ้ำในระบบแล้ว: "+skipped+" คัน";
 if(staffAdded)msg+="\nเพิ่มรายชื่อพนักงานใหม่: "+staffAdded+" คน";
