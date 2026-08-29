@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V22</title>
+<title>Transport Real-Time Control V23</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V22 • จำแท็บและการยืนยันตัวตนของวันเดียวกัน ไม่หายเมื่อรีเฟรช/รีโหลด</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V23 • แก้ race condition กันข้อมูลที่เพิ่งบันทึกโดนเขียนทับด้วยของเก่า</div></div>
 <div id="clock"></div>
 </header>
 
@@ -227,7 +227,9 @@ const API_URL="https://script.google.com/macros/s/AKfycbx023NaJG4kgHl5sK7PYbQPPf
 function apiGetTrucks(){
 return fetch(API_URL).then(r=>r.json());
 }
+let recentLocalSaves={};
 function apiSaveTruck(t){
+recentLocalSaves[t.id]=Date.now();
 return fetch(API_URL,{method:"POST",body:JSON.stringify({action:"saveTruck",truck:t})}).catch(err=>console.warn("sync (save) failed:",err));
 }
 function apiDeleteTruck(id){
@@ -1029,6 +1031,9 @@ let res=await apiGetTrucks();
 if(res&&res.ok&&Array.isArray(res.trucks)){
 res.trucks.forEach(serverT=>{
 let idx=trucks.findIndex(t=>t.id===serverT.id);
+let recentSaveTs=recentLocalSaves[serverT.id];
+let hasVeryFreshLocalSave=recentSaveTs&&(Date.now()-recentSaveTs<8000);
+if(hasVeryFreshLocalSave)return; // เพิ่งบันทึกจากเครื่องนี้ไปไม่ถึง 8 วินาที ข้อมูลที่อ่านมาอาจยังไม่ทันอัปเดต ข้ามไปก่อน รอบถัดไปค่อยเช็คใหม่
 if(idx>=0)trucks[idx]=serverT;
 else trucks.push(serverT);
 });
