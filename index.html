@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V24</title>
+<title>Transport Real-Time Control V25</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V24 • ทะเบียนรถ 2 กล่องใน Admin ซิงก์กันอัตโนมัติแล้ว</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V25 • เพิ่มปุ่ม "เริ่มเที่ยวใหม่" บันทึกงาน+รีเซ็ตสถานะในคลิกเดียว</div></div>
 <div id="clock"></div>
 </header>
 
@@ -104,6 +104,8 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 <div id="stopsContainer"></div>
 <button type="button" class="reason" style="text-align:center;font-weight:700" onclick="addStopRow()">+ เพิ่มจุดส่ง (ลูกค้า) — สูงสุด 3 จุด</button>
 <button class="primary" onclick="saveJob()">บันทึกข้อมูลเที่ยวรถ</button>
+<button class="primary" style="background:#166534;margin-top:8px" onclick="startNewTrip()">🔄 เริ่มเที่ยวใหม่ (บันทึก + รีเซ็ตสถานะ)</button>
+<p class="small" style="margin-top:4px">ใช้ปุ่มนี้เมื่อมอบหมายงานใหม่ให้รถคันเดิม — ปุ่มด้านบนใช้แค่แก้ไขข้อมูลของเที่ยวเดิมที่กำลังวิ่งอยู่เท่านั้น</p>
 </div>
 </div>
 </section>
@@ -614,8 +616,7 @@ let t=trucks[+jobTruck.value];
 renderStopsRows(t.stops&&t.stops.length?t.stops:[makeEmptyStop()]);
 }
 
-function saveJob(){
-let t=trucks[+jobTruck.value];
+function buildStopsFromForm(t,preserveProgress){
 let raw=collectStopsFromForm();
 let newStops=raw.map(r=>({
 customer:(r.customer||"").trim(),
@@ -625,7 +626,7 @@ unit:r.unit||"แผ่น",
 pallets:+r.pallets||0,
 problem:null,arriveTime:null,arriveTs:null,doneTime:null,doneTs:null
 }));
-if(t.stops){
+if(preserveProgress&&t.stops){
 newStops.forEach((s,i)=>{
 if(t.stops[i]){
 s.problem=t.stops[i].problem;
@@ -634,11 +635,29 @@ s.doneTime=t.stops[i].doneTime;s.doneTs=t.stops[i].doneTs;
 }
 });
 }
-t.stops=newStops;
+return newStops;
+}
+
+function saveJob(){
+let t=trucks[+jobTruck.value];
+t.stops=buildStopsFromForm(t,true);
 render();showDriver();renderReasonSection();
 apiSaveTruck(t);
 onAdminTruckChange();
 alert("บันทึกข้อมูลเที่ยวรถแล้ว — อัปเดตไปที่การ์ด Driver Mobile ให้อัตโนมัติ");
+}
+
+function startNewTrip(){
+let i=+jobTruck.value,t=trucks[i];
+if(!confirm('เริ่มเที่ยวใหม่สำหรับรถ "'+t.id+'" ?\n\nการกระทำนี้จะ:\n• บันทึกข้อมูลลูกค้า/SO ที่กรอกไว้เป็นเที่ยวใหม่ (ไม่เก็บเวลาถึง/เสร็จของเที่ยวเก่า)\n• รีเซ็ตสถานะกลับไปเริ่มต้นที่ "เตรียมสินค้าแล้ว"\n• ล้างการยืนยันตัวตนคนขับเก่า (บังคับให้คนขับยืนยันตัวตนใหม่สำหรับเที่ยวนี้)'))return;
+t.stops=buildStopsFromForm(t,false);
+t.verifiedDriver=null;t.verifiedTime=null;t.verifiedTs=null;t.verifiedPhoto=null;
+let di=+driverTruck.value;
+if(verifiedFor===di&&di===i)verifiedFor=null;
+render();showDriver();renderReasonSection();renderVerify();
+update(i,"เตรียมสินค้าแล้ว");
+onAdminTruckChange();
+alert("เริ่มเที่ยวใหม่สำหรับรถ "+t.id+" เรียบร้อยแล้ว — สถานะรีเซ็ตกลับไปเริ่มต้น และต้องยืนยันตัวตนใหม่ครับ");
 }
 
 function uploadTrucksExcel(){
