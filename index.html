@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transport Real-Time Control V23</title>
+<title>Transport Real-Time Control V24</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans Thai",sans-serif;background:#f4f7fb;color:#172033}
 header{background:#102a56;color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center}
@@ -36,7 +36,7 @@ button.primary:disabled{background:#94a3b8;cursor:not-allowed}
 </head>
 <body>
 <header>
-<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V23 • แก้ race condition กันข้อมูลที่เพิ่งบันทึกโดนเขียนทับด้วยของเก่า</div></div>
+<div><h1>🚚 TRANSPORT REAL-TIME CONTROL</h1><div class="sub">Prototype V24 • ทะเบียนรถ 2 กล่องใน Admin ซิงก์กันอัตโนมัติแล้ว</div></div>
 <div id="clock"></div>
 </header>
 
@@ -547,6 +547,13 @@ if(infoBox&&t){
 infoBox.innerHTML="<b>ประเภทรถ:</b> "+(t.type||'<span class="muted">ยังไม่ระบุ</span>')+"<br>"+
 "<b>เที่ยวงานปัจจุบันของรถนี้:</b><br>"+tripSummary(t).replace(/\n/g,"<br>")+
 (t.verifiedDriver?"<br><b>ยืนยันตัวตนโดย:</b> "+t.verifiedDriver:"<br><span class=\"muted\">ยังไม่มีการยืนยันตัวตน</span>");
+}
+// ซิงก์ทะเบียนรถในกล่อง "ข้อมูลเที่ยวรถ" ให้ตรงกับกล่อง "บันทึกสถานะโรงงาน" เสมอ
+// พร้อมโหลดข้อมูลเที่ยวรถที่เคยบันทึกไว้ของคันนี้มาโชว์ให้ครบทันที
+let jobTruckEl=document.getElementById("jobTruck");
+if(jobTruckEl&&jobTruckEl.value!==adminTruck.value){
+jobTruckEl.value=adminTruck.value;
+loadJob();
 }
 }
 
